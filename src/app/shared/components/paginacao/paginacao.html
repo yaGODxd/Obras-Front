@@ -1,0 +1,39 @@
+@if (totalPaginas() > 1) {
+  <div class="flex items-center justify-between mt-4">
+
+    <p class="text-sm text-base-content/60">
+      Mostrando {{ (pagina() - 1) * porPagina() + 1 }}–{{ [pagina() * porPagina(), total()].sort((a,b) => a-b)[0] }}
+      de {{ total() }} registros
+    </p>
+
+    <div class="join">
+      <button
+        class="join-item btn btn-sm"
+        [disabled]="pagina() === 1"
+        (click)="anterior()">
+        <i class="ti ti-chevron-left"></i>
+      </button>
+
+      @for (p of paginas(); track $index) {
+        @if (p === '...') {
+          <button class="join-item btn btn-sm btn-disabled">...</button>
+        } @else {
+          <button
+            class="join-item btn btn-sm"
+            [class.btn-primary]="p === pagina()"
+            (click)="irPara(p)">
+            {{ p }}
+          </button>
+        }
+      }
+
+      <button
+        class="join-item btn btn-sm"
+        [disabled]="pagina() === totalPaginas()"
+        (click)="proximo()">
+        <i class="ti ti-chevron-right"></i>
+      </button>
+    </div>
+
+  </div>
+}

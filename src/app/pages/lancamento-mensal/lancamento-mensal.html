@@ -1,0 +1,285 @@
+<div class="p-6">
+
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold">Lançamento Mensal</h1>
+      <p class="text-base-content/60 text-sm">Histórico de diários por veículo e período</p>
+    </div>
+  </div>
+
+  <div class="card bg-base-100 shadow mb-6">
+    <div class="card-body p-4">
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <select class="select select-bordered w-full"
+          [ngModel]="filtroMes()" (ngModelChange)="filtroMes.set(+$event)">
+          <option value="0">Todos os meses</option>
+          @for (m of meses; track m.valor) { <option [value]="m.valor">{{ m.label }}</option> }
+        </select>
+        <select class="select select-bordered w-full"
+          [ngModel]="filtroAno()" (ngModelChange)="filtroAno.set(+$event)">
+          <option value="0">Todos os anos</option>
+          @for (a of anos(); track a) { <option [value]="a">{{ a }}</option> }
+        </select>
+        <div class="relative">
+          <label class="input input-bordered flex items-center gap-2 w-full">
+            <i class="ti ti-truck text-base-content/40"></i>
+            <input type="text" class="grow" placeholder="Buscar veículo..."
+              [ngModel]="buscaVeiculo()"
+              (ngModelChange)="buscaVeiculo.set($event); mostrarSugestoes.set(true); filtroVeiculoId.set('')"
+              (focus)="mostrarSugestoes.set(true)"
+              (blur)="$event.relatedTarget ? null : mostrarSugestoes.set(false)" />
+            @if (filtroVeiculoId()) {
+              <button class="btn btn-ghost btn-xs" (click)="limparVeiculo()"><i class="ti ti-x"></i></button>
+            }
+          </label>
+          @if (mostrarSugestoes() && veiculosFiltradosBusca().length > 0) {
+            <div class="absolute z-50 w-full bg-base-100 border border-base-300 rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto">
+              <div class="px-4 py-2 hover:bg-base-200 cursor-pointer text-sm" (mousedown)="limparVeiculo()">
+                <span class="text-base-content/50">Todos os veículos</span>
+              </div>
+              @for (v of veiculosFiltradosBusca(); track v.id) {
+                <div class="px-4 py-2 hover:bg-base-200 cursor-pointer flex items-center gap-2"
+                  [class.bg-primary]="filtroVeiculoId() === v.id"
+                  [class.text-primary-content]="filtroVeiculoId() === v.id"
+                  (mousedown)="selecionarVeiculo(v)">
+                  <span class="text-sm font-medium flex-1">{{ v.descricao }}</span>
+                  @if (v.placa) {
+                    <span class="badge badge-outline badge-sm shrink-0" [class.badge-ghost]="filtroVeiculoId() === v.id">{{ v.placa }}</span>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+        <button class="btn btn-primary gap-2" (click)="buscar()">
+          <i class="ti ti-search"></i> Buscar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  @if (!resumoSelecionado()) {
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+      <div class="card bg-primary text-primary-content shadow">
+        <div class="card-body p-5">
+          <div class="flex items-center justify-between">
+            <div><p class="text-sm opacity-80">Total de diários</p><p class="text-3xl font-bold mt-1">{{ totalDiarios() }}</p></div>
+            <i class="ti ti-clipboard-list text-4xl opacity-60"></i>
+          </div>
+        </div>
+      </div>
+      <div class="card bg-info text-info-content shadow">
+        <div class="card-body p-5">
+          <div class="flex items-center justify-between">
+            <div><p class="text-sm opacity-80">Total percorrido</p><p class="text-3xl font-bold mt-1">{{ totalPercorrido() | number:'1.1-1' }}</p></div>
+            <i class="ti ti-road text-4xl opacity-60"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        @if (carregando()) {
+          <div class="flex justify-center py-16"><span class="loading loading-spinner loading-lg text-primary"></span></div>
+        } @else if (resumos().length === 0) {
+          <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
+            <i class="ti ti-clipboard-list text-6xl"></i><p class="font-medium">Nenhum registro encontrado para o período</p>
+          </div>
+        } @else {
+          <div class="overflow-x-auto">
+            <table class="table table-zebra table-hover">
+              <thead>
+                <tr><th>Veículo</th><th>Período</th><th>Diários</th><th>1º Medidor</th><th>Último Medidor</th><th>Total Percorrido</th><th class="text-center">Detalhes</th></tr>
+              </thead>
+              <tbody>
+                @for (r of resumos(); track r.veiculoId + r.mes + r.ano) {
+                  <tr class="cursor-pointer hover" (click)="verDiarios(r)">
+                    <td>
+                      <p class="font-medium">{{ r.veiculoDescricao }}</p>
+                      @if (r.veiculoPlaca) { <span class="badge badge-outline badge-xs mt-1">{{ r.veiculoPlaca }}</span> }
+                    </td>
+                    <td class="font-medium">{{ getNomeMes(r.mes) }}/{{ r.ano }}</td>
+                    <td><span class="badge badge-primary">{{ r.totalDiarios }}</span></td>
+                    <td class="font-medium">{{ r.primeiroMedidor | number:'1.1-1' }} {{ getMedidorUnidade(r) }}</td>
+                    <td class="font-medium">{{ r.ultimoMedidor | number:'1.1-1' }} {{ getMedidorUnidade(r) }}</td>
+                    <td class="font-bold text-info">{{ r.totalPercorrido | number:'1.1-1' }} {{ getMedidorUnidade(r) }}</td>
+                    <td class="text-center"><button class="btn btn-ghost btn-xs"><i class="ti ti-eye"></i></button></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  @if (resumoSelecionado()) {
+    <div class="flex items-center gap-3 mb-4">
+      <button class="btn btn-ghost btn-sm" (click)="voltar()"><i class="ti ti-arrow-left"></i></button>
+      <div>
+        <h2 class="text-xl font-bold">
+          {{ resumoSelecionado()!.veiculoDescricao }}
+          @if (resumoSelecionado()!.veiculoPlaca) { — {{ resumoSelecionado()!.veiculoPlaca }} }
+        </h2>
+        <p class="text-base-content/60 text-sm">{{ getNomeMes(resumoSelecionado()!.mes) }}/{{ resumoSelecionado()!.ano }} — {{ resumoSelecionado()!.totalDiarios }} diários</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div class="card bg-base-100 shadow">
+        <div class="card-body p-4">
+          <p class="text-xs text-base-content/50">1º Medidor do mês</p>
+          <p class="font-bold text-2xl text-primary mt-1">{{ resumoSelecionado()!.primeiroMedidor | number:'1.1-1' }} {{ getMedidorUnidade(resumoSelecionado()!) }}</p>
+        </div>
+      </div>
+      <div class="card bg-base-100 shadow">
+        <div class="card-body p-4">
+          <p class="text-xs text-base-content/50">Último Medidor do mês</p>
+          <p class="font-bold text-2xl text-primary mt-1">{{ resumoSelecionado()!.ultimoMedidor | number:'1.1-1' }} {{ getMedidorUnidade(resumoSelecionado()!) }}</p>
+        </div>
+      </div>
+      <div class="card bg-info text-info-content shadow">
+        <div class="card-body p-4">
+          <p class="text-xs opacity-80">Total percorrido</p>
+          <p class="font-bold text-2xl mt-1">{{ resumoSelecionado()!.totalPercorrido | number:'1.1-1' }} {{ getMedidorUnidade(resumoSelecionado()!) }}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        @if (carregandoDiarios()) {
+          <div class="flex justify-center py-16"><span class="loading loading-spinner loading-lg text-primary"></span></div>
+        } @else if (diarios().length === 0) {
+          <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
+            <i class="ti ti-clipboard-list text-6xl"></i><p class="font-medium">Nenhum diário encontrado</p>
+          </div>
+        } @else {
+          <div class="overflow-x-auto">
+            <table class="table table-zebra">
+              <thead>
+                <tr>
+                  <th>Data</th><th>Motorista</th><th>Destino</th>
+                  <th>Med. Inicial</th><th>Med. Final</th><th>Percorrido</th>
+                  <th class="text-center">Status</th>
+                  <th class="text-center">Rota</th>
+                  <th class="text-center">Checklist</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (d of diarios(); track d.id) {
+                  <tr>
+                    <td class="text-sm">
+                      {{ d.abertoEm | date:'dd/MM/yyyy' }}
+                      <p class="text-xs text-base-content/40">{{ d.abertoEm | date:'HH:mm' }}</p>
+                    </td>
+                    <td class="font-medium">{{ d.motoristaNome }}</td>
+                    <td class="text-sm text-base-content/70">{{ d.destino ?? '-' }}</td>
+                    <td class="font-medium">{{ d.medidorInicial | number:'1.1-1' }}</td>
+                    <td class="font-medium">{{ d.medidorFinal != null ? (d.medidorFinal | number:'1.1-1') : '-' }}</td>
+                    <td class="font-bold text-info">{{ d.medidorPercorrido != null ? (d.medidorPercorrido | number:'1.1-1') : '-' }}</td>
+                    <td class="text-center">
+                      <span class="badge {{ badgeStatus(d.status) }}">{{ labelStatus(d.status) }}</span>
+                    </td>
+                    <td class="text-center">
+                      <button class="btn btn-ghost btn-xs gap-1" (click)="abrirMapa(d, $event)">
+                        <i class="ti ti-map-pin text-primary"></i> Ver rota
+                      </button>
+                    </td>
+                    <td class="text-center">
+                      <button class="btn btn-ghost btn-xs gap-1" (click)="abrirChecklist(d, $event)">
+                        <i class="ti ti-checklist text-success"></i> Checklist
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Modal mapa -->
+  @if (modalMapaAberto()) {
+    <div class="modal modal-open">
+      <div class="modal-box max-w-3xl">
+        <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharMapa()"><i class="ti ti-x"></i></button>
+        <h3 class="font-bold text-lg mb-1">Rota do Diário</h3>
+        @if (diarioSelecionado()) {
+          <p class="text-sm text-base-content/60 mb-4">
+            {{ diarioSelecionado()!.motoristaNome }} — {{ diarioSelecionado()!.abertoEm | date:'dd/MM/yyyy HH:mm' }}
+            @if (diarioSelecionado()!.destino) { — {{ diarioSelecionado()!.destino }} }
+          </p>
+        }
+        <div class="relative" style="height: 400px;">
+          @if (carregandoRota()) {
+            <div class="absolute inset-0 flex items-center justify-center bg-base-200 rounded-xl z-10">
+              <span class="loading loading-spinner loading-lg text-primary"></span>
+            </div>
+          }
+          <div id="mapa-diario" style="height: 400px; border-radius: 12px; z-index: 0;"></div>
+        </div>
+        <div class="modal-action"><button class="btn" (click)="fecharMapa()">Fechar</button></div>
+      </div>
+      <div class="modal-backdrop" (click)="fecharMapa()"></div>
+    </div>
+  }
+
+  <!-- Modal checklist -->
+  @if (modalChecklistAberto()) {
+    <div class="modal modal-open">
+      <div class="modal-box max-w-2xl">
+        <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharChecklist()"><i class="ti ti-x"></i></button>
+        <h3 class="font-bold text-lg mb-1">Checklist de Vistoria</h3>
+        @if (diarioSelecionado()) {
+          <p class="text-sm text-base-content/60 mb-4">
+            {{ diarioSelecionado()!.motoristaNome }} — {{ diarioSelecionado()!.abertoEm | date:'dd/MM/yyyy HH:mm' }}
+          </p>
+        }
+        @if (carregandoChecklist()) {
+          <div class="flex justify-center py-8"><span class="loading loading-spinner loading-lg text-primary"></span></div>
+        } @else if (checklistDiario().length === 0) {
+          <div class="flex flex-col items-center py-8 gap-3 text-base-content/40">
+            <i class="ti ti-checklist text-5xl"></i>
+            <p>Nenhum checklist registrado para este diário</p>
+          </div>
+        } @else {
+          <div class="space-y-2">
+            @for (r of checklistDiario(); track r.id) {
+              <div class="flex items-center gap-3 p-3 rounded-lg"
+                [class.bg-success]="r.ok" [class.bg-error]="!r.ok"
+                style="background-color: {{ r.ok ? 'oklch(var(--su)/0.1)' : 'oklch(var(--er)/0.1)' }}">
+                <i class="ti text-xl"
+                  [class.ti-circle-check]="r.ok" [class.text-success]="r.ok"
+                  [class.ti-circle-x]="!r.ok" [class.text-error]="!r.ok"></i>
+                <div class="flex-1">
+                  <p class="font-medium text-sm">{{ r.descricao }}</p>
+                  @if (r.observacao) { <p class="text-xs text-base-content/60">{{ r.observacao }}</p> }
+                </div>
+                @if (r.obrigatorio) { <span class="badge badge-error badge-xs">Obrigatório</span> }
+              </div>
+            }
+          </div>
+          <div class="flex gap-6 mt-4 p-3 bg-base-200 rounded-lg">
+            <span class="text-sm text-success font-medium">
+              <i class="ti ti-check"></i> {{ checklistDiario().filter(r => r.ok).length }} OK
+            </span>
+            <span class="text-sm text-error font-medium">
+              <i class="ti ti-x"></i> {{ checklistDiario().filter(r => !r.ok).length }} Não OK
+            </span>
+            <span class="text-sm text-base-content/60">
+              Total: {{ checklistDiario().length }} itens
+            </span>
+          </div>
+        }
+        <div class="modal-action"><button class="btn" (click)="fecharChecklist()">Fechar</button></div>
+      </div>
+      <div class="modal-backdrop" (click)="fecharChecklist()"></div>
+    </div>
+  }
+
+</div>

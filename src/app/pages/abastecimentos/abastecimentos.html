@@ -1,0 +1,327 @@
+<div class="p-6">
+
+  <!-- Cabeçalho -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold">Abastecimentos</h1>
+      <p class="text-base-content/60 text-sm">Histórico de abastecimentos da frota</p>
+    </div>
+  </div>
+
+  <!-- Linha 1: Infos + Carrossel -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+
+    <!-- Card infos gerais -->
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h2 class="font-bold text-lg mb-3">
+          <i class="ti ti-chart-bar text-primary mr-2"></i>
+          Resumo Geral
+        </h2>
+        <div class="space-y-4">
+          <div>
+            <p class="text-xs text-base-content/50">Total de registros</p>
+            <p class="font-bold text-2xl text-primary">{{ abastecimentosFiltrados().length }}</p>
+          </div>
+          <div>
+            <p class="text-xs text-base-content/50">Total de litros</p>
+            <p class="font-bold text-xl text-info">{{ totalLitros() | number:'1.1-1' }} L</p>
+          </div>
+          <div>
+            <p class="text-xs text-base-content/50">Total gasto</p>
+            <p class="font-bold text-xl text-success">R$ {{ totalValor() | number:'1.2-2' }}</p>
+          </div>
+          @if (totalLitros() > 0) {
+            <div class="divider my-1"></div>
+            <div>
+              <p class="text-xs text-base-content/50">Preço médio por litro</p>
+              <p class="font-bold text-lg">R$ {{ (totalValor() / totalLitros()) | number:'1.2-2' }}/L</p>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- Carrossel gráficos -->
+    <div class="card bg-base-100 shadow lg:col-span-2">
+      <div class="card-body p-4">
+
+        <div class="carousel w-full rounded-lg overflow-hidden" style="height: 360px;">
+
+          <div id="geral-slide1" class="carousel-item w-full p-3" style="height: 360px;">
+            <canvas #grafico1 style="height: 320px !important; width: 100%;"></canvas>
+          </div>
+
+          <div id="geral-slide2" class="carousel-item w-full p-3" style="height: 360px;">
+            <canvas #grafico2 style="height: 320px !important; width: 100%;"></canvas>
+          </div>
+
+          <div id="geral-slide3" class="carousel-item w-full p-3" style="height: 360px;">
+            <canvas #grafico3 style="height: 320px !important; width: 100%;"></canvas>
+          </div>
+
+        </div>
+
+        <div class="flex justify-center gap-2 mt-2">
+          <button class="btn btn-xs" (click)="scrollParaSlide('geral-slide1')">1</button>
+          <button class="btn btn-xs" (click)="scrollParaSlide('geral-slide2')">2</button>
+          <button class="btn btn-xs" (click)="scrollParaSlide('geral-slide3')">3</button>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Filtros -->
+  <div class="card bg-base-100 shadow mb-4">
+    <div class="card-body p-4">
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+
+        <label class="input input-bordered flex items-center gap-2 sm:col-span-2">
+          <i class="ti ti-search text-base-content/40"></i>
+          <input
+            type="text"
+            class="grow"
+            placeholder="Buscar motorista, veículo, placa..."
+            [ngModel]="busca()"
+            (ngModelChange)="busca.set($event)" />
+        </label>
+
+        <select
+          class="select select-bordered w-full"
+          [ngModel]="filtroTipo()"
+          (ngModelChange)="filtroTipo.set($event)">
+          <option value="">Todos os combustíveis</option>
+          @for (tipo of tiposCombustivel(); track tipo) {
+            <option [value]="tipo">{{ tipo }}</option>
+          }
+        </select>
+
+        <button class="btn btn-outline" (click)="limparFiltros()">
+          <i class="ti ti-filter-off"></i>
+          Limpar filtros
+        </button>
+
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+        <div>
+          <label class="label"><span class="label-text text-xs">Data início</span></label>
+          <input
+            type="date"
+            class="input input-bordered w-full"
+            [ngModel]="filtroInicio()"
+            (ngModelChange)="filtroInicio.set($event)" />
+        </div>
+        <div>
+          <label class="label"><span class="label-text text-xs">Data fim</span></label>
+          <input
+            type="date"
+            class="input input-bordered w-full"
+            [ngModel]="filtroFim()"
+            (ngModelChange)="filtroFim.set($event)" />
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Lista -->
+  <div class="card bg-base-100 shadow">
+    <div class="card-body">
+
+      @if (carregando()) {
+        <div class="flex justify-center py-16">
+          <span class="loading loading-spinner loading-lg text-primary"></span>
+        </div>
+
+      } @else if (abastecimentosFiltrados().length === 0) {
+        <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
+          <i class="ti ti-droplet-off text-6xl"></i>
+          <p class="font-medium">Nenhum abastecimento encontrado</p>
+        </div>
+
+      } @else {
+        <div class="overflow-x-auto">
+          <table class="table table-zebra">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Motorista</th>
+                <th>Veículo</th>
+                <th>Combustível</th>
+                <th>Litros</th>
+                <th>Valor</th>
+                <th>Posto</th>
+                <th>Veículo Abastecido</th>
+              </tr>
+            </thead>
+            <tbody>
+  @for (a of abastecimentosPaginados(); track a.id) {
+    <tr class="cursor-pointer hover" (click)="abrirModal(a)">
+
+      <td class="text-sm text-base-content/70">
+        {{ a.registradoEm | date:'dd/MM/yyyy' }}
+        <p class="text-xs text-base-content/40">{{ a.registradoEm | date:'HH:mm' }}</p>
+      </td>
+
+      <td>
+        <div class="flex items-center gap-2" (click)="irParaMotorista(a.motoristaLogin, $event)">
+          @if (a.motoristaFoto) {
+            <div class="avatar">
+              <div class="w-9 h-9 rounded-full">
+                <img [src]="'data:image/jpeg;base64,' + a.motoristaFoto" alt="Foto" />
+              </div>
+            </div>
+          } @else {
+            <div class="avatar placeholder">
+              <div class="bg-primary text-primary-content rounded-full w-9 h-9">
+                <span class="text-sm font-bold">{{ a.motoristaNome.charAt(0) }}</span>
+              </div>
+            </div>
+          }
+          <span class="text-sm font-medium hover:text-primary hover:underline">
+            {{ a.motoristaNome }}
+          </span>
+        </div>
+      </td>
+
+      <td (click)="irParaVeiculo(a.veiculoId, $event)">
+        <p class="text-sm font-medium hover:text-primary hover:underline">
+          {{ a.veiculoDescricao }}
+        </p>
+        @if (a.veiculoPlaca) {
+          <span class="badge badge-outline badge-xs mt-1">{{ a.veiculoPlaca }}</span>
+        }
+      </td>
+
+      <td>
+  <div class="flex items-center gap-1 text-sm">
+    <i class="ti ti-droplet text-xs text-warning"></i>
+    {{ a.tipoCombustivel }}
+  </div>
+</td>
+
+      <td class="font-medium">{{ a.litros | number:'1.1-1' }} L</td>
+
+      <td>
+        <p class="font-bold text-success">R$ {{ a.valorTotal | number:'1.2-2' }}</p>
+        <p class="text-xs text-base-content/40">R$ {{ (a.valorTotal / a.litros) | number:'1.2-2' }}/L</p>
+      </td>
+
+      <td class="text-sm text-base-content/60">
+        @if (a.posto) {
+          <div class="flex items-center gap-1">
+            <i class="ti ti-building-store text-xs"></i>
+            {{ a.posto }}
+          </div>
+        } @else {
+          <span class="text-base-content/30">-</span>
+        }
+      </td>
+
+      <td class="text-sm">
+  @if (a.veiculoAbastecidoDescricao) {
+    <div class="flex items-center gap-1">
+      <i class="ti ti-truck text-xs text-base-content/50"></i>
+      {{ a.veiculoAbastecidoDescricao }}
+    </div>
+  } @else {
+    <span class="text-base-content/30">-</span>
+  }
+</td>
+
+    </tr>
+  }
+</tbody>
+          </table>
+
+          <app-paginacao
+  [total]="abastecimentosFiltrados().length"
+  [pagina]="paginaAtual()"
+  [porPagina]="porPagina"
+  (paginaMudou)="mudarPagina($event)">
+</app-paginacao>
+        </div>
+      }
+
+    </div>
+  </div>
+
+  <!-- Modal detalhes -->
+  @if (selecionado()) {
+    <div class="modal modal-open">
+      <div class="modal-box">
+
+        <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModal()">
+          <i class="ti ti-x"></i>
+        </button>
+
+        <h3 class="font-bold text-lg mb-4">Detalhes do Abastecimento</h3>
+
+        <div class="space-y-3">
+          <div class="flex justify-between items-center">
+            <span class="text-base-content/60 text-sm">Data</span>
+            <span class="font-medium">{{ selecionado()!.registradoEm | date:'dd/MM/yyyy HH:mm' }}</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-base-content/60 text-sm">Motorista</span>
+            <span class="font-medium">{{ selecionado()!.motoristaNome }}</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-base-content/60 text-sm">Veículo</span>
+            <span class="font-medium">{{ selecionado()!.veiculoDescricao }}</span>
+          </div>
+          @if (selecionado()!.veiculoPlaca) {
+            <div class="flex justify-between items-center">
+              <span class="text-base-content/60 text-sm">Placa</span>
+              <span class="badge badge-outline">{{ selecionado()!.veiculoPlaca }}</span>
+            </div>
+          }
+          <div class="flex justify-between items-center">
+            <span class="text-base-content/60 text-sm">Combustível</span>
+            <span class="badge {{ getCorCombustivel(selecionado()!.tipoCombustivel) }}">
+              {{ selecionado()!.tipoCombustivel }}
+            </span>
+          </div>
+          <div class="divider my-1"></div>
+          <div class="flex justify-between items-center">
+            <span class="text-base-content/60 text-sm">Litros</span>
+            <span class="font-medium">{{ selecionado()!.litros | number:'1.1-1' }} L</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-base-content/60 text-sm">Valor total</span>
+            <span class="font-bold text-success text-lg">R$ {{ selecionado()!.valorTotal | number:'1.2-2' }}</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-base-content/60 text-sm">Valor por litro</span>
+            <span class="font-medium">R$ {{ (selecionado()!.valorTotal / selecionado()!.litros) | number:'1.2-2' }}/L</span>
+          </div>
+          @if (selecionado()!.posto) {
+            <div class="divider my-1"></div>
+            <div class="flex justify-between items-center">
+              <span class="text-base-content/60 text-sm">Posto</span>
+              <span class="font-medium">{{ selecionado()!.posto }}</span>
+            </div>
+          }
+        </div>
+
+        <div class="modal-action">
+          <button class="btn btn-primary" (click)="irParaMotorista(selecionado()!.motoristaLogin, $event)">
+            <i class="ti ti-user"></i>
+            Ver motorista
+          </button>
+          <button class="btn btn-outline" (click)="irParaVeiculo(selecionado()!.veiculoId, $event)">
+            <i class="ti ti-truck"></i>
+            Ver veículo
+          </button>
+          <button class="btn" (click)="fecharModal()">Fechar</button>
+        </div>
+
+      </div>
+      <div class="modal-backdrop" (click)="fecharModal()"></div>
+    </div>
+  }
+
+</div>

@@ -1,0 +1,404 @@
+<div class="h-full overflow-hidden p-6 flex flex-col gap-5">
+
+  @if (carregando()) {
+    <div class="flex justify-center items-center py-20">
+      <span class="loading loading-spinner loading-lg text-primary"></span>
+    </div>
+  } @else if (veiculo(); as v) {
+
+    <!-- Header -->
+    <div class="card bg-base-100 shadow-sm">
+      <div class="card-body p-4">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <i class="ti ti-truck text-primary text-2xl"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <h1 class="text-lg font-bold">{{ v.descricao }}</h1>
+              <span class="badge badge-sm" [class]="badgeStatus(v.status)">{{ labelStatus(v.status) }}</span>
+            </div>
+            <div class="flex gap-4 mt-1 flex-wrap">
+              @if (v.placa) {
+                <span class="text-xs text-base-content/60 flex items-center gap-1">
+                  <i class="ti ti-id-badge text-sm"></i>{{ v.placa }}
+                </span>
+              }
+              @if (v.marca || v.modelo || v.ano) {
+                <span class="text-xs text-base-content/60 flex items-center gap-1">
+                  <i class="ti ti-tool text-sm"></i>
+                  {{ [v.marca, v.modelo, v.ano?.toString()].filter(x => !!x).join(' · ') }}
+                </span>
+              }
+              <span class="text-xs text-base-content/60 flex items-center gap-1">
+                <i class="ti ti-gauge text-sm"></i>{{ getMedidor(v) }}
+              </span>
+              <span class="text-xs text-base-content/60 flex items-center gap-1">
+                <i class="ti ti-category text-sm"></i>{{ v.tipoNome }}
+              </span>
+            </div>
+          </div>
+          <div class="flex gap-2 shrink-0 flex-wrap">
+            <button class="btn btn-sm btn-outline gap-2" (click)="abrirModalPeriodo('relatorio')">
+              <i class="ti ti-file-text"></i>Relatório
+            </button>
+            <button class="btn btn-sm btn-outline gap-2" (click)="abrirModalPeriodo('pecas')">
+              <i class="ti ti-package"></i>Peças
+            </button>
+            <button class="btn btn-sm btn-ghost gap-2" (click)="voltar()">
+              <i class="ti ti-arrow-left"></i>Voltar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cards resumo -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="stat bg-base-100 rounded-xl shadow-sm p-4">
+        <div class="stat-title text-xs">Abastecimentos</div>
+        <div class="stat-value text-2xl">{{ abastecimentos().length }}</div>
+        <div class="stat-desc">{{ totalLitros() | number:'1.1-1' }} L no total</div>
+      </div>
+      <div class="stat bg-base-100 rounded-xl shadow-sm p-4">
+        <div class="stat-title text-xs">Gasto combustível</div>
+        <div class="stat-value text-xl text-info">{{ totalGasto() | number:'1.2-2' }}</div>
+        <div class="stat-desc">R$ acumulado</div>
+      </div>
+      <div class="stat bg-base-100 rounded-xl shadow-sm p-4">
+        <div class="stat-title text-xs">Ocorrências</div>
+        <div class="stat-value text-2xl" [class.text-error]="ocorrencias().length > 0">{{ ocorrencias().length }}</div>
+        <div class="stat-desc">registradas</div>
+      </div>
+      <div class="stat bg-base-100 rounded-xl shadow-sm p-4">
+        <div class="stat-title text-xs">Custo manutenção</div>
+        <div class="stat-value text-xl text-warning">{{ totalCustoManutencao() | number:'1.2-2' }}</div>
+        <div class="stat-desc">R$ acumulado</div>
+      </div>
+    </div>
+
+    <!-- Cards motoristas -->
+    @if (motoristaMaisUsou() || ultimoMotorista()) {
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        @if (motoristaMaisUsou(); as m) {
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body p-4 flex-row items-center gap-3">
+              @if (m.fotoPerfil) {
+                <div class="avatar shrink-0">
+                  <div class="w-10 h-10 rounded-full">
+                    <img [src]="usuarioService.getFotoUrl(m.fotoPerfil)" alt="Foto" />
+                  </div>
+                </div>
+              } @else {
+                <div class="avatar placeholder shrink-0">
+                  <div class="w-10 h-10 rounded-full bg-primary text-primary-content">
+                    <span class="text-sm font-bold">{{ getIniciais(m.nomeCompleto) }}</span>
+                  </div>
+                </div>
+              }
+              <div class="min-w-0">
+                <p class="text-xs text-base-content/50">Mais utiliza</p>
+                <p class="font-semibold text-sm truncate">{{ m.nomeCompleto }}</p>
+                @if (m.totalUsos) {
+                  <p class="text-xs text-base-content/50">{{ m.totalUsos }} usos</p>
+                }
+              </div>
+            </div>
+          </div>
+        }
+        @if (ultimoMotorista(); as m) {
+          <div class="card bg-base-100 shadow-sm">
+            <div class="card-body p-4 flex-row items-center gap-3">
+              @if (m.fotoPerfil) {
+                <div class="avatar shrink-0">
+                  <div class="w-10 h-10 rounded-full">
+                    <img [src]="usuarioService.getFotoUrl(m.fotoPerfil)" alt="Foto" />
+                  </div>
+                </div>
+              } @else {
+                <div class="avatar placeholder shrink-0">
+                  <div class="w-10 h-10 rounded-full bg-success text-success-content">
+                    <span class="text-sm font-bold">{{ getIniciais(m.nomeCompleto) }}</span>
+                  </div>
+                </div>
+              }
+              <div class="min-w-0">
+                <p class="text-xs text-base-content/50">Último uso</p>
+                <p class="font-semibold text-sm truncate">{{ m.nomeCompleto }}</p>
+                @if (m.ultimoUso) {
+                  <p class="text-xs text-base-content/50">{{ m.ultimoUso | date:'dd/MM/yyyy HH:mm' }}</p>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Abas -->
+    <div class="card bg-base-100 shadow-sm flex-1 flex flex-col min-h-0">
+      <div class="card-body p-0 flex flex-col min-h-0">
+
+        <div class="flex border-b border-base-300 px-4 pt-2 gap-1 overflow-x-auto">
+          <button class="px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
+                  [class.border-primary]="abaAtiva() === 'abastecimentos'"
+                  [class.text-primary]="abaAtiva() === 'abastecimentos'"
+                  [class.border-transparent]="abaAtiva() !== 'abastecimentos'"
+                  [class.text-base-content]="abaAtiva() !== 'abastecimentos'"
+                  (click)="setAba('abastecimentos')">
+            <i class="ti ti-droplet mr-1"></i>Abastecimentos
+            <span class="badge badge-xs ml-1">{{ abastecimentos().length }}</span>
+          </button>
+          <button class="px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
+                  [class.border-primary]="abaAtiva() === 'ocorrencias'"
+                  [class.text-primary]="abaAtiva() === 'ocorrencias'"
+                  [class.border-transparent]="abaAtiva() !== 'ocorrencias'"
+                  [class.text-base-content]="abaAtiva() !== 'ocorrencias'"
+                  (click)="setAba('ocorrencias')">
+            <i class="ti ti-alert-circle mr-1"></i>Ocorrências
+            @if (ocorrencias().length > 0) {
+              <span class="badge badge-xs badge-error ml-1">{{ ocorrencias().length }}</span>
+            }
+          </button>
+          <button class="px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
+                  [class.border-primary]="abaAtiva() === 'manutencoes'"
+                  [class.text-primary]="abaAtiva() === 'manutencoes'"
+                  [class.border-transparent]="abaAtiva() !== 'manutencoes'"
+                  [class.text-base-content]="abaAtiva() !== 'manutencoes'"
+                  (click)="setAba('manutencoes')">
+            <i class="ti ti-tool mr-1"></i>Manutenções
+            <span class="badge badge-xs ml-1">{{ manutencoes().length }}</span>
+          </button>
+          <button class="px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
+                  [class.border-primary]="abaAtiva() === 'pecas'"
+                  [class.text-primary]="abaAtiva() === 'pecas'"
+                  [class.border-transparent]="abaAtiva() !== 'pecas'"
+                  [class.text-base-content]="abaAtiva() !== 'pecas'"
+                  (click)="setAba('pecas')">
+            <i class="ti ti-package mr-1"></i>Peças
+          </button>
+        </div>
+
+        <div class="p-4 overflow-y-auto flex-1">
+
+          <!-- Abastecimentos -->
+          @if (abaAtiva() === 'abastecimentos') {
+            @if (abastecimentos().length === 0) {
+              <div class="flex flex-col items-center py-8 gap-2 text-base-content/40">
+                <i class="ti ti-droplet-off text-3xl"></i>
+                <p class="text-sm">Nenhum abastecimento registrado</p>
+              </div>
+            } @else {
+              <div class="overflow-x-auto">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Data</th><th>Motorista</th><th>Combustível</th>
+                      <th class="text-right">Litros</th><th class="text-right">Valor</th><th>Posto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (a of abastecimentos(); track a.id) {
+                      <tr class="hover">
+                        <td class="text-xs text-base-content/60">{{ a.registradoEm | date:'dd/MM/yyyy HH:mm' }}</td>
+                        <td class="text-sm">{{ a.motoristaNome }}</td>
+                        <td><span class="badge badge-sm" [class]="getCorCombustivel(a.tipoCombustivel)">{{ a.tipoCombustivel }}</span></td>
+                        <td class="text-right text-sm">{{ a.litros | number:'1.1-1' }} L</td>
+                        <td class="text-right text-sm font-medium">R$ {{ a.valorTotal | number:'1.2-2' }}</td>
+                        <td class="text-sm text-base-content/60">{{ a.posto ?? '—' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                  <tfoot>
+                    <tr class="font-bold">
+                      <td colspan="3" class="text-xs text-base-content/50">{{ abastecimentos().length }} registros</td>
+                      <td class="text-right">{{ totalLitros() | number:'1.1-1' }} L</td>
+                      <td class="text-right">R$ {{ totalGasto() | number:'1.2-2' }}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            }
+          }
+
+          <!-- Ocorrências -->
+          @if (abaAtiva() === 'ocorrencias') {
+            @if (ocorrencias().length === 0) {
+              <div class="flex flex-col items-center py-8 gap-2 text-base-content/40">
+                <i class="ti ti-circle-check text-3xl text-success"></i>
+                <p class="text-sm">Nenhuma ocorrência registrada</p>
+              </div>
+            } @else {
+              <div class="flex flex-col gap-2">
+                @for (o of ocorrencias(); track o.id) {
+                  <div class="flex items-start gap-3 p-3 rounded-lg bg-base-200 hover:bg-base-300 cursor-pointer transition-colors"
+                       (click)="abrirModalOcorrencia(o)">
+                    <span class="badge badge-sm mt-0.5" [class]="getCorTipo(o.tipo)">{{ o.tipo }}</span>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-medium truncate">{{ o.descricao }}</p>
+                      <p class="text-xs text-base-content/50">{{ o.motoristaNome }} · {{ o.registradoEm | date:'dd/MM/yyyy HH:mm' }}</p>
+                    </div>
+                    @if (o.latitude && o.longitude) {
+                      <i class="ti ti-map-pin text-primary text-sm shrink-0 mt-0.5"></i>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          }
+
+          <!-- Manutenções -->
+          @if (abaAtiva() === 'manutencoes') {
+            @if (manutencoes().length === 0) {
+              <div class="flex flex-col items-center py-8 gap-2 text-base-content/40">
+                <i class="ti ti-tool text-3xl"></i>
+                <p class="text-sm">Nenhuma manutenção registrada</p>
+              </div>
+            } @else {
+              <div class="flex flex-col gap-2">
+                @for (m of manutencoes(); track m.id) {
+                  <div class="flex items-start gap-3 p-3 rounded-lg bg-base-200 hover:bg-base-300 cursor-pointer transition-colors"
+                       (click)="verManutencao(m.id)">
+                    <div class="flex flex-col gap-1 shrink-0">
+                      <span class="badge badge-sm" [class]="badgeStatusManutencao(m.status)">{{ labelStatusManutencao(m.status) }}</span>
+                      <span class="badge badge-sm" [class]="badgeTipoManutencao(m.tipo)">{{ labelTipoManutencao(m.tipo) }}</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-medium truncate">{{ m.descricao }}</p>
+                      <p class="text-xs text-base-content/50">{{ m.mecanicoResponsavel ?? 'Sem mecânico' }} · {{ m.abertaEm | date:'dd/MM/yyyy' }}</p>
+                    </div>
+                    <div class="text-right shrink-0">
+                      <p class="text-sm font-bold">R$ {{ m.custoTotal | number:'1.2-2' }}</p>
+                      <i class="ti ti-chevron-right text-base-content/30 text-sm"></i>
+                    </div>
+                  </div>
+                }
+              </div>
+              <div class="flex justify-end mt-3 pt-3 border-t border-base-300">
+                <span class="text-sm font-bold">Total: R$ {{ totalCustoManutencao() | number:'1.2-2' }}</span>
+              </div>
+            }
+          }
+
+          <!-- Peças -->
+          @if (abaAtiva() === 'pecas') {
+            @if (manutencoes().length === 0 || manutencoes().every(m => m.pecas.length === 0)) {
+              <div class="flex flex-col items-center py-8 gap-2 text-base-content/40">
+                <i class="ti ti-package text-3xl"></i>
+                <p class="text-sm">Nenhuma peça registrada</p>
+              </div>
+            } @else {
+              <div class="overflow-x-auto">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Peça</th><th>Código</th><th>Marca</th>
+                      <th class="text-right">Qtd</th><th class="text-right">Valor unit.</th><th class="text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (m of manutencoes(); track m.id) {
+                      @for (p of m.pecas; track p.id) {
+                        <tr class="hover">
+                          <td class="text-sm font-medium">{{ p.nomePeca }}</td>
+                          <td class="text-xs text-base-content/50">{{ p.codigoPeca ?? '—' }}</td>
+                          <td class="text-xs text-base-content/50">{{ p.marcaPeca ?? '—' }}</td>
+                          <td class="text-right text-sm">{{ p.quantidade }}</td>
+                          <td class="text-right text-sm">R$ {{ p.valorUnitario | number:'1.2-2' }}</td>
+                          <td class="text-right text-sm font-medium">R$ {{ p.valorTotal | number:'1.2-2' }}</td>
+                        </tr>
+                      }
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+
+        </div>
+      </div>
+    </div>
+
+  } @else {
+    <div class="flex flex-col items-center py-20 gap-3 text-base-content/40">
+      <i class="ti ti-truck-off text-4xl"></i>
+      <p>Veículo não encontrado</p>
+      <button class="btn btn-sm btn-outline" (click)="voltar()">Voltar</button>
+    </div>
+  }
+
+</div>
+
+<!-- Modal ocorrência -->
+@if (ocorrenciaSelecionada()) {
+  <div class="modal modal-open">
+    <div class="modal-box max-w-lg">
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModalOcorrencia()">
+        <i class="ti ti-x"></i>
+      </button>
+      <h3 class="font-bold text-lg mb-4">Ocorrência</h3>
+      <div class="space-y-3">
+        <div class="flex justify-between items-center">
+          <span class="text-sm text-base-content/60">Tipo</span>
+          <span class="badge" [class]="getCorTipo(ocorrenciaSelecionada()!.tipo)">{{ ocorrenciaSelecionada()!.tipo }}</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-sm text-base-content/60">Motorista</span>
+          <span class="font-medium text-sm">{{ ocorrenciaSelecionada()!.motoristaNome }}</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-sm text-base-content/60">Data</span>
+          <span class="font-medium text-sm">{{ ocorrenciaSelecionada()!.registradoEm | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+        <div>
+          <p class="text-sm text-base-content/60 mb-1">Descrição</p>
+          <p class="text-sm bg-base-200 rounded-lg p-3">{{ ocorrenciaSelecionada()!.descricao }}</p>
+        </div>
+        @if (ocorrenciaSelecionada()!.latitude && ocorrenciaSelecionada()!.longitude) {
+          <div>
+            <p class="text-sm text-base-content/60 mb-2"><i class="ti ti-map-pin text-primary mr-1"></i>Local</p>
+            <div id="mapa-ocorrencia-detalhe" class="w-full rounded-lg border border-base-300" style="height:220px;"></div>
+          </div>
+        }
+      </div>
+      <div class="modal-action">
+        <button class="btn" (click)="fecharModalOcorrencia()">Fechar</button>
+      </div>
+    </div>
+    <div class="modal-backdrop" (click)="fecharModalOcorrencia()"></div>
+  </div>
+}
+
+<!-- Modal período -->
+@if (modalPeriodo()) {
+  <div class="modal modal-open">
+    <div class="modal-box max-w-sm">
+      <h3 class="font-bold text-lg mb-4">
+        {{ modalPeriodo() === 'relatorio' ? 'Gerar relatório' : 'Relatório de peças' }}
+      </h3>
+      <div class="flex flex-col gap-3">
+        <div class="form-control">
+          <label class="label"><span class="label-text text-sm">Data início</span></label>
+          <input type="date" class="input input-bordered input-sm"
+                 [value]="periodoInicio()"
+                 (change)="periodoInicio.set($any($event.target).value)" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text text-sm">Data fim</span></label>
+          <input type="date" class="input input-bordered input-sm"
+                 [value]="periodoFim()"
+                 (change)="periodoFim.set($any($event.target).value)" />
+        </div>
+      </div>
+      <div class="modal-action">
+        <button class="btn btn-ghost btn-sm" (click)="fecharModalPeriodo()">Cancelar</button>
+        <button class="btn btn-primary btn-sm gap-2" (click)="confirmarRelatorio()" [disabled]="gerandoPDF()">
+          @if (gerandoPDF()) { <span class="loading loading-spinner loading-xs"></span> }
+          <i class="ti ti-download"></i>Gerar PDF
+        </button>
+      </div>
+    </div>
+    <div class="modal-backdrop" (click)="fecharModalPeriodo()"></div>
+  </div>
+}

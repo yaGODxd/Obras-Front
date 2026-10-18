@@ -1,0 +1,199 @@
+<div class="p-6">
+
+  @if (carregando()) {
+    <div class="flex justify-center py-16">
+      <span class="loading loading-spinner loading-lg text-primary"></span>
+    </div>
+  } @else if (manutencao()) {
+
+    <!-- Cabeçalho -->
+    <div class="flex items-center gap-3 mb-6">
+      <button class="btn btn-ghost btn-sm" (click)="voltar()">
+        <i class="ti ti-arrow-left"></i>
+      </button>
+      <div class="flex-1">
+        <div class="flex items-center gap-2 flex-wrap">
+          <h1 class="text-2xl font-bold">{{ manutencao()!.veiculoDescricao }}</h1>
+          <span class="badge {{ badgeTipo(manutencao()!.tipo) }}">{{ labelTipo(manutencao()!.tipo) }}</span>
+          <span class="badge {{ badgeStatus(manutencao()!.status) }}">{{ labelStatus(manutencao()!.status) }}</span>
+        </div>
+        @if (manutencao()!.veiculoPlaca) {
+          <span class="badge badge-outline mt-1">{{ manutencao()!.veiculoPlaca }}</span>
+        }
+      </div>
+    </div>
+
+    <!-- Linha 1: Dados + Custos -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+
+      <!-- Dados gerais -->
+      <div class="card bg-base-100 shadow lg:col-span-2">
+        <div class="card-body">
+          <h2 class="font-bold text-lg mb-3">
+            <i class="ti ti-tool text-primary mr-2"></i>
+            Dados da Manutenção
+          </h2>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-base-200 rounded-lg p-3">
+              <p class="text-xs text-base-content/50">Veículo</p>
+              <p class="font-semibold">{{ manutencao()!.veiculoDescricao }}</p>
+            </div>
+            @if (manutencao()!.veiculoPlaca) {
+              <div class="bg-base-200 rounded-lg p-3">
+                <p class="text-xs text-base-content/50">Placa</p>
+                <p class="font-semibold">{{ manutencao()!.veiculoPlaca }}</p>
+              </div>
+            }
+            <div class="bg-base-200 rounded-lg p-3">
+              <p class="text-xs text-base-content/50">Data de abertura</p>
+              <p class="font-semibold">{{ manutencao()!.abertaEm | date:'dd/MM/yyyy HH:mm' }}</p>
+            </div>
+            @if (manutencao()!.concluidaEm) {
+              <div class="bg-base-200 rounded-lg p-3">
+                <p class="text-xs text-base-content/50">Data de conclusão</p>
+                <p class="font-semibold">{{ manutencao()!.concluidaEm | date:'dd/MM/yyyy HH:mm' }}</p>
+              </div>
+            }
+            @if (manutencao()!.mecanicoResponsavel) {
+              <div class="bg-base-200 rounded-lg p-3">
+                <p class="text-xs text-base-content/50">Mecânico</p>
+                <p class="font-semibold">{{ manutencao()!.mecanicoResponsavel }}</p>
+              </div>
+            }
+            @if (manutencao()!.oficina) {
+              <div class="bg-base-200 rounded-lg p-3">
+                <p class="text-xs text-base-content/50">Oficina</p>
+                <p class="font-semibold">{{ manutencao()!.oficina }}</p>
+              </div>
+            }
+            <div class="bg-base-200 rounded-lg p-3 col-span-2">
+              <p class="text-xs text-base-content/50">Descrição</p>
+              <p class="font-semibold">{{ manutencao()!.descricao }}</p>
+            </div>
+            @if (manutencao()!.observacoes) {
+              <div class="bg-base-200 rounded-lg p-3 col-span-2">
+                <p class="text-xs text-base-content/50">Observações</p>
+                <p class="text-sm">{{ manutencao()!.observacoes }}</p>
+              </div>
+            }
+            @if (manutencao()!.ocorrenciaId) {
+              <div class="bg-base-200 rounded-lg p-3 col-span-2">
+                <p class="text-xs text-base-content/50">Ocorrência vinculada</p>
+                <p class="font-medium text-sm font-mono">{{ manutencao()!.ocorrenciaId }}</p>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Custos + Atualizar status -->
+      <div class="flex flex-col gap-4">
+
+        <div class="card bg-base-100 shadow">
+          <div class="card-body p-4">
+            <p class="text-xs text-base-content/50 uppercase mb-1">Mão de obra</p>
+            <p class="text-2xl font-bold">R$ {{ manutencao()!.custoMaoObra | number:'1.2-2' }}</p>
+          </div>
+        </div>
+
+        <div class="card bg-base-100 shadow">
+          <div class="card-body p-4">
+            <p class="text-xs text-base-content/50 uppercase mb-1">Peças</p>
+            <p class="text-2xl font-bold">R$ {{ manutencao()!.custoPecas | number:'1.2-2' }}</p>
+          </div>
+        </div>
+
+        <div class="card bg-primary text-primary-content shadow">
+          <div class="card-body p-4">
+            <p class="text-xs uppercase mb-1 opacity-70">Custo total</p>
+            <p class="text-2xl font-bold">R$ {{ manutencao()!.custoTotal | number:'1.2-2' }}</p>
+          </div>
+        </div>
+
+        <!-- Atualizar status -->
+        @if (manutencao()!.status !== 'concluida') {
+          <div class="card bg-base-100 shadow">
+            <div class="card-body p-4">
+              <p class="text-xs text-base-content/50 uppercase mb-3">Atualizar status</p>
+              <select class="select select-bordered select-sm w-full mb-2" [(ngModel)]="novoStatus">
+                <option value="aberta">Aberta</option>
+                <option value="em_andamento">Em andamento</option>
+                <option value="concluida">Concluída</option>
+              </select>
+              <textarea
+                class="textarea textarea-bordered textarea-sm w-full mb-2"
+                rows="2"
+                placeholder="Observações (opcional)"
+                [(ngModel)]="novaObservacao">
+              </textarea>
+              <button
+                class="btn btn-primary btn-sm w-full"
+                (click)="atualizarStatus()"
+                [disabled]="atualizando()">
+                @if (atualizando()) {
+                  <span class="loading loading-spinner loading-xs"></span>
+                }
+                Atualizar
+              </button>
+            </div>
+          </div>
+        }
+
+      </div>
+
+    </div>
+
+    <!-- Peças utilizadas -->
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h2 class="font-bold text-lg mb-4">
+          <i class="ti ti-package text-primary mr-2"></i>
+          Peças utilizadas
+        </h2>
+
+        @if (manutencao()!.pecas.length === 0) {
+          <div class="flex flex-col items-center py-12 gap-3 text-base-content/40">
+            <i class="ti ti-package text-5xl"></i>
+            <p class="font-medium">Nenhuma peça registrada</p>
+          </div>
+        } @else {
+          <div class="overflow-x-auto">
+            <table class="table table-zebra">
+              <thead>
+                <tr>
+                  <th>Peça</th>
+                  <th>Código</th>
+                  <th>Marca</th>
+                  <th class="text-center">Qtd</th>
+                  <th class="text-right">Valor unit.</th>
+                  <th class="text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (p of manutencao()!.pecas; track p.id) {
+                  <tr>
+                    <td class="font-medium">{{ p.nomePeca }}</td>
+                    <td class="text-base-content/60 text-sm">{{ p.codigoPeca ?? '-' }}</td>
+                    <td class="text-base-content/60 text-sm">{{ p.marcaPeca ?? '-' }}</td>
+                    <td class="text-center">{{ p.quantidade }}</td>
+                    <td class="text-right">R$ {{ p.valorUnitario | number:'1.2-2' }}</td>
+                    <td class="text-right font-bold text-primary">R$ {{ p.valorTotal | number:'1.2-2' }}</td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="5" class="text-right font-bold">Total peças:</td>
+                  <td class="text-right font-bold text-primary">R$ {{ manutencao()!.custoPecas | number:'1.2-2' }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        }
+
+      </div>
+    </div>
+
+  }
+
+</div>

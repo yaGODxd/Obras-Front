@@ -1,0 +1,424 @@
+<div class="p-6">
+
+  <!-- Cabeçalho -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold">Manutenções</h1>
+      <p class="text-sm text-base-content/60 mt-1">Ordens de serviço da frota</p>
+    </div>
+    <button class="btn btn-primary gap-2" (click)="abrirModal()">
+      <i class="ti ti-plus text-lg"></i>
+      Nova Manutenção
+    </button>
+  </div>
+
+  <!-- Cards resumo -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <div class="card bg-primary text-primary-content shadow">
+      <div class="card-body p-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm opacity-80">Total de manutenções</p>
+            <p class="text-3xl font-bold mt-1">{{ manutencoes().length }}</p>
+          </div>
+          <i class="ti ti-tool text-4xl opacity-60"></i>
+        </div>
+      </div>
+    </div>
+    <div class="card bg-warning text-warning-content shadow">
+      <div class="card-body p-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm opacity-80">Em aberto</p>
+            <p class="text-3xl font-bold mt-1">{{ totalAbertas() }}</p>
+          </div>
+          <i class="ti ti-alert-circle text-4xl opacity-60"></i>
+        </div>
+      </div>
+    </div>
+    <div class="card bg-success text-success-content shadow">
+      <div class="card-body p-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm opacity-80">Custo total</p>
+            <p class="text-3xl font-bold mt-1">R$ {{ totalCusto() | number:'1.2-2' }}</p>
+          </div>
+          <i class="ti ti-cash text-4xl opacity-60"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="card bg-base-100 shadow mb-4">
+    <div class="card-body p-4">
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <label class="input input-bordered flex items-center gap-2 sm:col-span-2">
+          <i class="ti ti-search text-base-content/40"></i>
+          <input type="text" class="grow" placeholder="Buscar por veículo, descrição ou mecânico..."
+            [ngModel]="busca()" (ngModelChange)="busca.set($event)" />
+        </label>
+        <select class="select select-bordered w-full"
+          [ngModel]="filtroTipo()" (ngModelChange)="filtroTipo.set($event)">
+          <option value="">Todos os tipos</option>
+          <option value="preventiva">Preventiva</option>
+          <option value="corretiva">Corretiva</option>
+        </select>
+        <select class="select select-bordered w-full"
+          [ngModel]="filtroStatus()" (ngModelChange)="filtroStatus.set($event)">
+          <option value="">Todos os status</option>
+          <option value="aberta">Aberta</option>
+          <option value="em_andamento">Em andamento</option>
+          <option value="concluida">Concluída</option>
+        </select>
+      </div>
+      <div class="flex justify-end mt-3">
+        <button class="btn btn-outline btn-sm" (click)="limparFiltros()">
+          <i class="ti ti-filter-off"></i>
+          Limpar filtros
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lista -->
+  <div class="card bg-base-100 shadow">
+    <div class="card-body">
+      @if (carregando()) {
+        <div class="flex justify-center py-16">
+          <span class="loading loading-spinner loading-lg text-primary"></span>
+        </div>
+      } @else if (manutencoesFiltradas().length === 0) {
+        <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
+          <i class="ti ti-tool text-6xl"></i>
+          <p class="font-medium">Nenhuma manutenção encontrada</p>
+          <button class="btn btn-ghost btn-sm" (click)="limparFiltros()">Limpar filtros</button>
+        </div>
+      } @else {
+        <div class="overflow-x-auto">
+          <table class="table table-zebra table-hover">
+            <thead>
+              <tr>
+                <th>Veículo</th>
+                <th>Descrição</th>
+                <th>Tipo</th>
+                <th>Mecânico</th>
+                <th>Data</th>
+                <th class="text-right">Custo total</th>
+                <th class="text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (m of manutencoesPaginadas(); track m.id) {
+                <tr class="cursor-pointer hover" (click)="verDetalhe(m.id!)">
+                  <td>
+                    <p class="font-medium">{{ m.veiculoDescricao }}</p>
+                    @if (m.veiculoPlaca) {
+                      <span class="badge badge-outline badge-xs mt-1">{{ m.veiculoPlaca }}</span>
+                    }
+                  </td>
+                  <td class="max-w-xs">
+                    <p class="text-sm truncate">{{ m.descricao }}</p>
+                  </td>
+                  <td>
+                    <span class="badge badge-outline">{{ labelTipo(m.tipo) }}</span>
+                  </td>
+                  <td class="text-sm text-base-content/70">
+                    {{ m.mecanicoResponsavel ?? '-' }}
+                    @if (m.oficina) {
+                      <p class="text-xs text-base-content/40">{{ m.oficina }}</p>
+                    }
+                  </td>
+                  <td class="text-sm">
+                    {{ m.abertaEm | date:'dd/MM/yyyy' }}
+                    <p class="text-xs text-base-content/40">{{ m.abertaEm | date:'HH:mm' }}</p>
+                  </td>
+                  <td class="text-right font-bold text-primary">
+                    R$ {{ m.custoTotal | number:'1.2-2' }}
+                  </td>
+                  <td class="text-center">
+                    <span class="badge badge-outline {{ badgeStatus(m.status) }}">
+                      {{ labelStatus(m.status) }}
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          <app-paginacao
+            [total]="manutencoesFiltradas().length"
+            [pagina]="paginaAtual()"
+            [porPagina]="porPagina"
+            (paginaMudou)="mudarPagina($event)">
+          </app-paginacao>
+        </div>
+      }
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL NOVA MANUTENÇÃO -->
+@if (modalAberto()) {
+  <div class="modal modal-open">
+    <div class="modal-box max-w-3xl">
+
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModal()">
+        <i class="ti ti-x"></i>
+      </button>
+
+      <h3 class="font-bold text-lg mb-1">Nova Manutenção</h3>
+      <p class="text-sm text-base-content/60 mb-6">Preencha os dados da ordem de serviço</p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Veículo *</span></label>
+          <select class="select select-bordered" [(ngModel)]="novaManutencao.veiculoId">
+            <option value="">Selecione o veículo</option>
+            @for (v of veiculos(); track v.id) {
+              <option [value]="v.id">{{ v.descricao }} {{ v.placa ? '— ' + v.placa : '' }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Tipo *</span></label>
+          <select class="select select-bordered" [(ngModel)]="novaManutencao.tipo">
+            <option value="preventiva">Preventiva</option>
+            <option value="corretiva">Corretiva</option>
+          </select>
+        </div>
+
+        <div class="form-control sm:col-span-2">
+          <label class="label"><span class="label-text font-medium">Descrição *</span></label>
+          <input type="text" class="input input-bordered" placeholder="Descreva o serviço"
+            [(ngModel)]="novaManutencao.descricao" />
+        </div>
+
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Mecânico responsável</span></label>
+          <select class="select select-bordered" [(ngModel)]="novaManutencao.mecanicoResponsavel">
+            <option [value]="null">Selecione o mecânico</option>
+            @for (m of mecanicos(); track m.id) {
+              <option [value]="m.nome">{{ m.nome }}{{ m.especialidade ? ' — ' + m.especialidade : '' }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Posto/Oficina</span></label>
+          <select class="select select-bordered" [(ngModel)]="novaManutencao.oficina">
+            <option [value]="null">Selecione o posto/oficina</option>
+            @for (p of postos(); track p.id) {
+              <option [value]="p.nome">{{ p.nome }}{{ p.cidade ? ' — ' + p.cidade : '' }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Custo mão de obra (R$)</span></label>
+          <input type="number" class="input input-bordered" min="0" [(ngModel)]="novaManutencao.custoMaoObra" />
+        </div>
+
+        <div class="form-control sm:col-span-2">
+          <label class="label"><span class="label-text font-medium">Ocorrência vinculada (opcional)</span></label>
+          @if (ocorrenciaSelecionadaNome()) {
+            <div class="flex items-center gap-2 p-3 bg-base-200 rounded-lg">
+              <i class="ti ti-alert-triangle text-warning"></i>
+              <span class="text-sm flex-1">{{ ocorrenciaSelecionadaNome() }}</span>
+              <button class="btn btn-ghost btn-xs text-error" (click)="limparOcorrencia()">
+                <i class="ti ti-x"></i>
+              </button>
+            </div>
+          } @else {
+            <button class="btn btn-outline gap-2 w-full" (click)="abrirModalOcorrencia()">
+              <i class="ti ti-search"></i>
+              Buscar ocorrência para vincular
+            </button>
+          }
+        </div>
+
+        <div class="form-control sm:col-span-2">
+          <label class="label"><span class="label-text font-medium">Foto da nota fiscal (opcional)</span></label>
+          @if (fotoNotaFiscal) {
+            <div class="flex items-center gap-3 p-3 bg-base-200 rounded-lg">
+              <img [src]="'data:image/jpeg;base64,' + fotoNotaFiscal" class="w-16 h-16 object-cover rounded-lg" />
+              <span class="text-sm flex-1">Foto anexada</span>
+              <button class="btn btn-ghost btn-xs text-error" (click)="limparFotoNota()">
+                <i class="ti ti-trash"></i>
+              </button>
+            </div>
+          } @else {
+            <input type="file" class="file-input file-input-bordered w-full"
+              accept="image/*" (change)="onFotoNotaFiscal($event)" />
+          }
+        </div>
+
+        <div class="form-control sm:col-span-2">
+          <label class="label"><span class="label-text font-medium">Observações</span></label>
+          <textarea class="textarea textarea-bordered" rows="2" placeholder="Observações adicionais"
+            [(ngModel)]="novaManutencao.observacoes"></textarea>
+        </div>
+
+      </div>
+
+      <div class="divider">Peças utilizadas</div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-3">
+        <div class="sm:col-span-2 form-control">
+          <label class="label py-1"><span class="label-text text-xs">Nome da peça *</span></label>
+          <input type="text" class="input input-bordered input-sm" placeholder="Ex: Filtro de óleo"
+            [(ngModel)]="novaPeca.nomePeca" />
+        </div>
+        <div class="form-control">
+          <label class="label py-1"><span class="label-text text-xs">Código</span></label>
+          <input type="text" class="input input-bordered input-sm" placeholder="Ex: 12345"
+            [(ngModel)]="novaPeca.codigoPeca" />
+        </div>
+        <div class="form-control">
+          <label class="label py-1"><span class="label-text text-xs">Marca</span></label>
+          <input type="text" class="input input-bordered input-sm" placeholder="Ex: Bosch"
+            [(ngModel)]="novaPeca.marcaPeca" />
+        </div>
+        <div class="form-control">
+          <label class="label py-1"><span class="label-text text-xs">Qtd</span></label>
+          <input type="number" class="input input-bordered input-sm" min="1" [(ngModel)]="novaPeca.quantidade" />
+        </div>
+        <div class="form-control sm:col-span-2">
+          <label class="label py-1"><span class="label-text text-xs">Valor unitário (R$)</span></label>
+          <input type="number" class="input input-bordered input-sm" min="0" [(ngModel)]="novaPeca.valorUnitario" />
+        </div>
+        <div class="sm:col-span-3 flex items-end">
+          <button class="btn btn-outline btn-sm gap-2 w-full" (click)="adicionarPeca()">
+            <i class="ti ti-plus"></i>
+            Adicionar peça
+          </button>
+        </div>
+      </div>
+
+      @if (pecasForm.length > 0) {
+        <div class="card bg-base-200 mb-4">
+          <div class="card-body p-3">
+            <div class="overflow-x-auto">
+              <table class="table table-xs">
+                <thead>
+                  <tr>
+                    <th>Peça</th>
+                    <th>Código</th>
+                    <th>Marca</th>
+                    <th class="text-center">Qtd</th>
+                    <th class="text-right">Valor unit.</th>
+                    <th class="text-right">Total</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (p of pecasForm; track $index) {
+                    <tr>
+                      <td class="font-medium">{{ p.nomePeca }}</td>
+                      <td class="text-base-content/60">{{ p.codigoPeca ?? '-' }}</td>
+                      <td class="text-base-content/60">{{ p.marcaPeca ?? '-' }}</td>
+                      <td class="text-center">{{ p.quantidade }}</td>
+                      <td class="text-right">R$ {{ p.valorUnitario | number:'1.2-2' }}</td>
+                      <td class="text-right font-bold text-primary">R$ {{ (p.quantidade * p.valorUnitario) | number:'1.2-2' }}</td>
+                      <td>
+                        <button class="btn btn-ghost btn-xs text-error" (click)="removerPeca($index)">
+                          <i class="ti ti-trash"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <div class="flex justify-end gap-6 mt-2 text-sm">
+              <span class="text-base-content/60">Peças: <span class="font-bold">R$ {{ totalPecas() | number:'1.2-2' }}</span></span>
+              <span class="text-base-content/60">Mão de obra: <span class="font-bold">R$ {{ (novaManutencao.custoMaoObra ?? 0) | number:'1.2-2' }}</span></span>
+              <span class="text-base-content/60">Total: <span class="font-bold text-primary">R$ {{ totalGeral() | number:'1.2-2' }}</span></span>
+            </div>
+          </div>
+        </div>
+      }
+
+      <div class="modal-action">
+        <button class="btn btn-ghost" (click)="fecharModal()">Cancelar</button>
+        <button class="btn btn-primary gap-2" (click)="salvar()" [disabled]="salvando()">
+          @if (salvando()) {
+            <span class="loading loading-spinner loading-xs"></span>
+          }
+          <i class="ti ti-device-floppy"></i>
+          Salvar
+        </button>
+      </div>
+
+    </div>
+    <div class="modal-backdrop" (click)="fecharModal()"></div>
+  </div>
+}
+
+<!-- MODAL BUSCA OCORRÊNCIA -->
+@if (modalOcorrencia()) {
+  <div class="modal modal-open" style="z-index: 1000;">
+    <div class="modal-box max-w-2xl">
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModalOcorrencia()">
+        <i class="ti ti-x"></i>
+      </button>
+      <h3 class="font-bold text-lg mb-4">Buscar Ocorrência</h3>
+      <label class="input input-bordered flex items-center gap-2 mb-4">
+        <i class="ti ti-search text-base-content/40"></i>
+        <input type="text" class="grow" placeholder="Buscar por tipo, veículo ou motorista..."
+          [ngModel]="buscaOcorrencia()" (ngModelChange)="buscaOcorrencia.set($event)" />
+      </label>
+      @if (ocorrencias().length === 0) {
+        <div class="flex justify-center py-8">
+          <span class="loading loading-spinner loading-md text-primary"></span>
+        </div>
+      } @else if (ocorrenciasFiltradas().length === 0) {
+        <div class="flex flex-col items-center py-8 gap-2 text-base-content/40">
+          <i class="ti ti-alert-triangle text-4xl"></i>
+          <p class="text-sm">Nenhuma ocorrência encontrada</p>
+        </div>
+      } @else {
+        <div class="overflow-y-auto max-h-96">
+          <table class="table table-zebra table-hover">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Tipo</th>
+                <th>Veículo</th>
+                <th>Motorista</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (o of ocorrenciasFiltradas(); track o.id) {
+                <tr class="cursor-pointer hover" (click)="selecionarOcorrencia(o)">
+                  <td class="text-sm">{{ o.registradoEm | date:'dd/MM/yyyy' }}</td>
+                  <td><span class="badge badge-sm badge-outline">{{ o.tipo }}</span></td>
+                  <td class="text-sm">
+                    <p class="font-medium">{{ o.veiculoDescricao }}</p>
+                    @if (o.veiculoPlaca) {
+                      <span class="badge badge-outline badge-xs">{{ o.veiculoPlaca }}</span>
+                    }
+                  </td>
+                  <td class="text-sm">{{ o.motoristaNome }}</td>
+                  <td>
+                    <button class="btn btn-primary btn-xs">
+                      <i class="ti ti-check"></i>
+                      Vincular
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+      <div class="modal-action">
+        <button class="btn btn-ghost" (click)="fecharModalOcorrencia()">Fechar</button>
+      </div>
+    </div>
+    <div class="modal-backdrop" (click)="fecharModalOcorrencia()"></div>
+  </div>
+}

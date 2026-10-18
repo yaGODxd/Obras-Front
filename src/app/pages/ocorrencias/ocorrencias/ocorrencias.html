@@ -1,0 +1,284 @@
+<div class="p-6">
+
+  <!-- Cabeçalho -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold">Ocorrências</h1>
+      <p class="text-base-content/60 text-sm">Registro de ocorrências da frota</p>
+    </div>
+  </div>
+
+  <!-- Cards resumo -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+
+    <div class="card bg-primary text-primary-content shadow">
+      <div class="card-body p-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm opacity-80">Total de ocorrências</p>
+            <p class="text-3xl font-bold mt-1">{{ totalOcorrencias() }}</p>
+          </div>
+          <i class="ti ti-alert-triangle text-4xl opacity-60"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-warning text-warning-content shadow">
+      <div class="card-body p-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm opacity-80">Com localização</p>
+            <p class="text-3xl font-bold mt-1">{{ comLocalizacao() }}</p>
+          </div>
+          <i class="ti ti-map-pin text-4xl opacity-60"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-error text-error-content shadow">
+      <div class="card-body p-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm opacity-80">Tipos diferentes</p>
+            <p class="text-3xl font-bold mt-1">{{ tiposOcorrencia().length }}</p>
+          </div>
+          <i class="ti ti-list text-4xl opacity-60"></i>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Filtros -->
+  <div class="card bg-base-100 shadow mb-4">
+    <div class="card-body p-4">
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+
+        <label class="input input-bordered flex items-center gap-2 sm:col-span-2">
+          <i class="ti ti-search text-base-content/40"></i>
+          <input
+            type="text"
+            class="grow"
+            placeholder="Buscar por tipo, motorista, veículo..."
+            [ngModel]="busca()"
+            (ngModelChange)="busca.set($event)" />
+        </label>
+
+        <select
+          class="select select-bordered w-full"
+          [ngModel]="filtroTipo()"
+          (ngModelChange)="filtroTipo.set($event)">
+          <option value="">Todos os tipos</option>
+          @for (tipo of tiposOcorrencia(); track tipo) {
+            <option [value]="tipo">{{ tipo }}</option>
+          }
+        </select>
+
+        <button class="btn btn-outline" (click)="limparFiltros()">
+          <i class="ti ti-filter-off"></i>
+          Limpar filtros
+        </button>
+
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+        <div>
+          <label class="label"><span class="label-text text-xs">Data início</span></label>
+          <input
+            type="date"
+            class="input input-bordered w-full"
+            [ngModel]="filtroInicio()"
+            (ngModelChange)="filtroInicio.set($event)" />
+        </div>
+        <div>
+          <label class="label"><span class="label-text text-xs">Data fim</span></label>
+          <input
+            type="date"
+            class="input input-bordered w-full"
+            [ngModel]="filtroFim()"
+            (ngModelChange)="filtroFim.set($event)" />
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Lista -->
+  <div class="card bg-base-100 shadow">
+    <div class="card-body">
+
+      @if (carregando()) {
+        <div class="flex justify-center py-16">
+          <span class="loading loading-spinner loading-lg text-primary"></span>
+        </div>
+
+      } @else if (ocorrenciasFiltradas().length === 0) {
+        <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
+          <i class="ti ti-alert-triangle text-6xl"></i>
+          <p class="font-medium">Nenhuma ocorrência encontrada</p>
+        </div>
+
+      } @else {
+        <div class="overflow-x-auto">
+          <table class="table table-zebra">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Motorista</th>
+                <th>Veículo</th>
+                <th>Tipo</th>
+                <th>Descrição</th>
+                <th>Localização</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (o of ocorrenciasPaginadas(); track o.id) {
+                <tr class="cursor-pointer hover" (click)="abrirModal(o)">
+
+                  <td class="text-sm">
+                    {{ o.registradoEm | date:'dd/MM/yyyy' }}
+                    <p class="text-xs text-base-content/40">{{ o.registradoEm | date:'HH:mm' }}</p>
+                  </td>
+
+                 <td>
+  <div class="flex items-center gap-2" (click)="irParaMotorista(o.motoristaLogin, $event)">
+    @if (o.motoristaFoto) {
+      <div class="avatar">
+        <div class="w-9 h-9 rounded-full">
+          <img [src]="'data:image/jpeg;base64,' + o.motoristaFoto" alt="Foto" />
+        </div>
+      </div>
+    } @else {
+      <div class="avatar placeholder">
+        <div class="bg-primary text-primary-content rounded-full w-9 h-9">
+          <span class="text-sm font-bold">{{ o.motoristaNome.charAt(0) }}</span>
+        </div>
+      </div>
+    }
+    <span class="text-sm font-medium hover:text-primary hover:underline">
+      {{ o.motoristaNome }}
+    </span>
+  </div>
+</td>
+
+                  <td (click)="irParaVeiculo(o.veiculoId, $event)">
+                    <p class="text-sm font-medium hover:text-primary hover:underline">
+                      {{ o.veiculoDescricao }}
+                    </p>
+                    @if (o.veiculoPlaca) {
+                      <span class="badge badge-outline badge-xs mt-1">{{ o.veiculoPlaca }}</span>
+                    }
+                  </td>
+
+                  <td>
+                    <span class="badge {{ getCorTipo(o.tipo) }}">
+                      {{ o.tipo }}
+                    </span>
+                  </td>
+
+                  <td class="text-sm text-base-content/70 max-w-xs truncate">
+                    {{ o.descricao }}
+                  </td>
+
+                  <td>
+                    @if (o.latitude && o.longitude) {
+                      <span class="badge badge-success gap-1">
+                        <i class="ti ti-map-pin text-xs"></i>
+                        GPS
+                      </span>
+                    } @else {
+                      <span class="text-base-content/30 text-sm">-</span>
+                    }
+                  </td>
+
+                </tr>
+              }
+            </tbody>
+          </table>
+          <app-paginacao
+  [total]="ocorrenciasFiltradas().length"
+  [pagina]="paginaAtual()"
+  [porPagina]="porPagina"
+  (paginaMudou)="mudarPagina($event)">
+</app-paginacao>
+        </div>
+      }
+
+    </div>
+  </div>
+
+  <!-- Modal -->
+  @if (selecionada()) {
+    <div class="modal modal-open">
+      <div class="modal-box max-w-2xl">
+
+        <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModal()">
+          <i class="ti ti-x"></i>
+        </button>
+
+        <h3 class="font-bold text-lg mb-4">Detalhes da Ocorrência</h3>
+
+        <div class="space-y-3 mb-4">
+
+          <div class="flex justify-between items-center">
+            <span class="text-base-content/60 text-sm">Data</span>
+            <span class="font-medium">{{ selecionada()!.registradoEm | date:'dd/MM/yyyy HH:mm' }}</span>
+          </div>
+
+          <div class="flex justify-between items-center">
+            <span class="text-base-content/60 text-sm">Motorista</span>
+            <span class="font-medium">{{ selecionada()!.motoristaNome }}</span>
+          </div>
+
+          <div class="flex justify-between items-center">
+            <span class="text-base-content/60 text-sm">Veículo</span>
+            <span class="font-medium">{{ selecionada()!.veiculoDescricao }}</span>
+          </div>
+
+          @if (selecionada()!.veiculoPlaca) {
+            <div class="flex justify-between items-center">
+              <span class="text-base-content/60 text-sm">Placa</span>
+              <span class="badge badge-outline">{{ selecionada()!.veiculoPlaca }}</span>
+            </div>
+          }
+
+          <div class="flex justify-between items-center">
+            <span class="text-base-content/60 text-sm">Tipo</span>
+            <span class="badge {{ getCorTipo(selecionada()!.tipo) }}">{{ selecionada()!.tipo }}</span>
+          </div>
+
+          <div class="divider my-1"></div>
+
+          <div>
+            <p class="text-base-content/60 text-sm mb-1">Descrição</p>
+            <p class="text-sm">{{ selecionada()!.descricao }}</p>
+          </div>
+
+        </div>
+
+        <!-- Mapa -->
+        @if (selecionada()!.latitude && selecionada()!.longitude) {
+          <div class="mt-4">
+            <p class="text-base-content/60 text-sm mb-2">
+              <i class="ti ti-map-pin mr-1"></i>
+              Local da ocorrência
+            </p>
+            <div id="mapa-ocorrencia" style="height: 250px; border-radius: 12px; z-index: 0;"></div>
+          </div>
+        } @else {
+          <div class="mt-4 flex items-center gap-2 text-base-content/40">
+            <i class="ti ti-map-pin-off"></i>
+            <span class="text-sm">Sem localização registrada</span>
+          </div>
+        }
+
+        <div class="modal-action">
+          <button class="btn" (click)="fecharModal()">Fechar</button>
+        </div>
+
+      </div>
+      <div class="modal-backdrop" (click)="fecharModal()"></div>
+    </div>
+  }
+
+</div>

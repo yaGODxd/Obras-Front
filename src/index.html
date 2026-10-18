@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="obras-slate">
+<head>
+  <meta charset="utf-8">
+  <title>SistemaObras</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+  <style>
+  [data-theme="obras-light"] {
+    --color-base-100: #F8FAFC;
+    --color-base-200: #EEF2F7;
+    --color-base-300: #DDE3ED;
+    --color-base-content: #1E293B;
+    --color-primary: #3F51B5;
+    --color-primary-content: #FFFFFF;
+    --color-secondary: #00BCD4;
+    --color-secondary-content: #FFFFFF;
+    --color-accent: #FF9800;
+    --color-accent-content: #FFFFFF;
+    --color-neutral: #334155;
+    --color-neutral-content: #FFFFFF;
+    --color-info: #0EA5E9;
+    --color-info-content: #FFFFFF;
+    --color-success: #22C55E;
+    --color-success-content: #FFFFFF;
+    --color-warning: #F59E0B;
+    --color-warning-content: #FFFFFF;
+    --color-error: #EF4444;
+    --color-error-content: #FFFFFF;
+  }
+
+  [data-theme="obras-dark"] {
+    --color-base-100: #0F172A;
+    --color-base-200: #1E293B;
+    --color-base-300: #334155;
+    --color-base-content: #E2E8F0;
+    --color-primary: #6366F1;
+    --color-primary-content: #FFFFFF;
+    --color-secondary: #06B6D4;
+    --color-secondary-content: #FFFFFF;
+    --color-accent: #F59E0B;
+    --color-accent-content: #000000;
+    --color-neutral: #475569;
+    --color-neutral-content: #FFFFFF;
+    --color-info: #38BDF8;
+    --color-info-content: #000000;
+    --color-success: #4ADE80;
+    --color-success-content: #000000;
+    --color-warning: #FBBF24;
+    --color-warning-content: #000000;
+    --color-error: #F87171;
+    --color-error-content: #000000;
+  }
+
+  [data-theme="obras-slate"] {
+    --color-base-100: #F1F5F9;
+    --color-base-200: #E2E8F0;
+    --color-base-300: #CBD5E1;
+    --color-base-content: #0F172A;
+    --color-primary: #475569;
+    --color-primary-content: #FFFFFF;
+    --color-secondary: #64748B;
+    --color-secondary-content: #FFFFFF;
+    --color-accent: #3B82F6;
+    --color-accent-content: #FFFFFF;
+    --color-neutral: #1E293B;
+    --color-neutral-content: #FFFFFF;
+    --color-info: #3B82F6;
+    --color-info-content: #FFFFFF;
+    --color-success: #10B981;
+    --color-success-content: #FFFFFF;
+    --color-warning: #F59E0B;
+    --color-warning-content: #FFFFFF;
+    --color-error: #EF4444;
+    --color-error-content: #FFFFFF;
+  }
+
+  [data-theme="obras-ocean"] {
+    --color-base-100: #EFF6FF;
+    --color-base-200: #DBEAFE;
+    --color-base-300: #BFDBFE;
+    --color-base-content: #1E3A5F;
+    --color-primary: #1D4ED8;
+    --color-primary-content: #FFFFFF;
+    --color-secondary: #0891B2;
+    --color-secondary-content: #FFFFFF;
+    --color-accent: #7C3AED;
+    --color-accent-content: #FFFFFF;
+    --color-neutral: #1E3A5F;
+    --color-neutral-content: #FFFFFF;
+    --color-info: #0EA5E9;
+    --color-info-content: #FFFFFF;
+    --color-success: #059669;
+    --color-success-content: #FFFFFF;
+    --color-warning: #D97706;
+    --color-warning-content: #FFFFFF;
+    --color-error: #DC2626;
+    --color-error-content: #FFFFFF;
+  }
+
+  [data-theme="obras-green"] {
+    --color-base-100: #F0FDF4;
+    --color-base-200: #DCFCE7;
+    --color-base-300: #BBF7D0;
+    --color-base-content: #14532D;
+    --color-primary: #16A34A;
+    --color-primary-content: #FFFFFF;
+    --color-secondary: #0D9488;
+    --color-secondary-content: #FFFFFF;
+    --color-accent: #CA8A04;
+    --color-accent-content: #FFFFFF;
+    --color-neutral: #14532D;
+    --color-neutral-content: #FFFFFF;
+    --color-info: #0284C7;
+    --color-info-content: #FFFFFF;
+    --color-success: #15803D;
+    --color-success-content: #FFFFFF;
+    --color-warning: #B45309;
+    --color-warning-content: #FFFFFF;
+    --color-error: #B91C1C;
+    --color-error-content: #FFFFFF;
+  }
+</style>
+</head>
+<body>
+  <app-root></app-root>
+</body>
+</html>

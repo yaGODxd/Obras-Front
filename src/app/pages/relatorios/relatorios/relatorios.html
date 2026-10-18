@@ -1,0 +1,237 @@
+<div class="p-6">
+
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold">Relatórios</h1>
+      <p class="text-base-content/60 text-sm">Gere relatórios operacionais, cadastrais e de análise</p>
+    </div>
+  </div>
+
+  <!-- Abas -->
+  <div class="tabs tabs-bordered mb-6">
+    <button class="tab gap-2 text-base" [class.tab-active]="abaAtiva() === 'operacionais'" (click)="abaAtiva.set('operacionais')">
+      <i class="ti ti-clipboard-list"></i> Operacionais
+    </button>
+    <button class="tab gap-2 text-base" [class.tab-active]="abaAtiva() === 'cadastrais'" (click)="abaAtiva.set('cadastrais')">
+      <i class="ti ti-database"></i> Cadastrais
+    </button>
+    <button class="tab gap-2 text-base" [class.tab-active]="abaAtiva() === 'analises'" (click)="abaAtiva.set('analises')">
+      <i class="ti ti-chart-bar"></i> Análises
+    </button>
+  </div>
+
+  <!-- ABA: OPERACIONAIS -->
+  @if (abaAtiva() === 'operacionais') {
+
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+      @for (tipo of tipos; track tipo.valor) {
+        <div class="card shadow cursor-pointer transition-all"
+          [class.bg-primary]="tipoRelatorio() === tipo.valor"
+          [class.text-primary-content]="tipoRelatorio() === tipo.valor"
+          [class.bg-base-100]="tipoRelatorio() !== tipo.valor"
+          (click)="tipoRelatorio.set(tipo.valor)">
+          <div class="card-body p-4 items-center text-center">
+            <i class="ti {{ tipo.icone }} text-3xl"></i>
+            <p class="font-medium text-sm mt-1">{{ tipo.label }}</p>
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="card bg-base-100 shadow mb-4">
+      <div class="card-body p-4">
+        <h2 class="font-bold mb-3 text-sm text-base-content/60 uppercase">Filtros</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="label"><span class="label-text text-xs">Data início</span></label>
+            <input type="date" class="input input-bordered w-full" [ngModel]="filtroInicio()" (ngModelChange)="filtroInicio.set($event)" />
+          </div>
+          <div>
+            <label class="label"><span class="label-text text-xs">Data fim</span></label>
+            <input type="date" class="input input-bordered w-full" [ngModel]="filtroFim()" (ngModelChange)="filtroFim.set($event)" />
+          </div>
+          <div>
+            <label class="label"><span class="label-text text-xs">Veículo (opcional)</span></label>
+            <select class="select select-bordered w-full" [ngModel]="filtroVeiculoId()" (ngModelChange)="filtroVeiculoId.set($event)">
+              <option value="">Todos os veículos</option>
+              @for (v of veiculos(); track v.id) {
+                <option [value]="v.id">{{ v.descricao }} {{ v.placa ? '— ' + v.placa : '' }}</option>
+              }
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        <h2 class="font-bold mb-1">
+          Gerar relatório de <span class="text-primary">{{ tipos.find(t => t.valor === tipoRelatorio())?.label }}</span>
+        </h2>
+        <p class="text-base-content/60 text-sm mb-4">
+          @if (filtroInicio() || filtroFim()) {
+            Período: {{ filtroInicio() || '—' }} até {{ filtroFim() || '—' }}
+          } @else {
+            Sem filtro de período — todos os registros serão incluídos
+          }
+        </p>
+        <div class="flex gap-4 flex-wrap">
+          <button class="btn btn-outline btn-primary gap-2" (click)="gerarCSV()" [disabled]="carregando()">
+            @if (carregando()) { <span class="loading loading-spinner loading-xs"></span> }
+            @else { <i class="ti ti-file-text"></i> }
+            Exportar CSV
+          </button>
+          <button class="btn btn-primary gap-2" (click)="gerarPDF()" [disabled]="carregando()">
+            @if (carregando()) { <span class="loading loading-spinner loading-xs"></span> }
+            @else { <i class="ti ti-file-type-pdf"></i> }
+            Exportar PDF
+          </button>
+        </div>
+      </div>
+    </div>
+
+  }
+
+  <!-- ABA: CADASTRAIS -->
+  @if (abaAtiva() === 'cadastrais') {
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+
+      <!-- Relatório de veículos -->
+      <div class="card bg-base-100 shadow">
+        <div class="card-body">
+          <div class="flex items-center gap-3 mb-2">
+            <i class="ti ti-truck text-primary text-2xl"></i>
+            <h2 class="font-bold text-lg">Cadastro de Veículos</h2>
+          </div>
+          <p class="text-base-content/60 text-sm mb-4">Todos os veículos com dados completos: marca, modelo, ano, placa, chassi, RENAVAM e status.</p>
+          <button class="btn btn-primary gap-2 w-full" (click)="gerarCadastralVeiculos()" [disabled]="carregando()">
+            @if (carregando()) { <span class="loading loading-spinner loading-xs"></span> }
+            @else { <i class="ti ti-file-type-pdf"></i> }
+            Gerar PDF
+          </button>
+        </div>
+      </div>
+
+      <!-- Relatório de usuários -->
+      <div class="card bg-base-100 shadow">
+        <div class="card-body">
+          <div class="flex items-center gap-3 mb-2">
+            <i class="ti ti-users text-primary text-2xl"></i>
+            <h2 class="font-bold text-lg">Cadastro de Usuários</h2>
+          </div>
+          <p class="text-base-content/60 text-sm mb-4">Todos os usuários com dados completos: matrícula, vínculo, secretaria, CNH e status.</p>
+          <button class="btn btn-primary gap-2 w-full" (click)="gerarCadastralUsuarios()" [disabled]="carregando()">
+            @if (carregando()) { <span class="loading loading-spinner loading-xs"></span> }
+            @else { <i class="ti ti-file-type-pdf"></i> }
+            Gerar PDF
+          </button>
+        </div>
+      </div>
+
+      
+
+    </div>
+
+  }
+
+  <!-- ABA: ANÁLISES -->
+  @if (abaAtiva() === 'analises') {
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+
+      <div class="card bg-base-100 shadow">
+        <div class="card-body">
+          <div class="flex items-center gap-3 mb-2">
+            <i class="ti ti-coin text-warning text-2xl"></i>
+            <h2 class="font-bold text-lg">Custos Gerais por Veículo</h2>
+          </div>
+          <p class="text-base-content/60 text-sm mb-4">Resumo de gastos com combustível e manutenção agrupados por veículo, ordenados pelo maior custo.</p>
+          <button class="btn btn-primary gap-2 w-full" (click)="gerarCustosGerais()" [disabled]="carregando()">
+            @if (carregando()) { <span class="loading loading-spinner loading-xs"></span> }
+            @else { <i class="ti ti-file-type-pdf"></i> }
+            Gerar PDF
+          </button>
+        </div>
+      </div>
+
+      <div class="card bg-base-100 shadow">
+        <div class="card-body">
+          <div class="flex items-center gap-3 mb-2">
+            <i class="ti ti-trophy text-warning text-2xl"></i>
+            <h2 class="font-bold text-lg">Ranking de Motoristas</h2>
+          </div>
+          <p class="text-base-content/60 text-sm mb-4">Ranking com quem mais rodou, abasteceu e registrou ocorrências.</p>
+          <button class="btn btn-primary gap-2 w-full" (click)="gerarRankingMotoristas()" [disabled]="carregando()">
+            @if (carregando()) { <span class="loading loading-spinner loading-xs"></span> }
+            @else { <i class="ti ti-file-type-pdf"></i> }
+            Gerar PDF
+          </button>
+        </div>
+      </div>
+
+      <div class="card bg-base-100 shadow">
+        <div class="card-body">
+          <div class="flex items-center gap-3 mb-2">
+            <i class="ti ti-package text-info text-2xl"></i>
+            <h2 class="font-bold text-lg">Peças Mais Utilizadas</h2>
+          </div>
+          <p class="text-base-content/60 text-sm mb-4">Ranking das peças que mais apareceram nas manutenções com custo total.</p>
+          <button class="btn btn-primary gap-2 w-full" (click)="gerarPecasMaisUsadas()" [disabled]="carregando()">
+            @if (carregando()) { <span class="loading loading-spinner loading-xs"></span> }
+            @else { <i class="ti ti-file-type-pdf"></i> }
+            Gerar PDF
+          </button>
+        </div>
+      </div>
+
+      <div class="card bg-base-100 shadow">
+        <div class="card-body">
+          <div class="flex items-center gap-3 mb-2">
+            <i class="ti ti-tool text-error text-2xl"></i>
+            <h2 class="font-bold text-lg">Veículos com Mais Manutenções</h2>
+          </div>
+          <p class="text-base-content/60 text-sm mb-4">Ranking dos veículos mais problemáticos com custo total de manutenções.</p>
+          <button class="btn btn-primary gap-2 w-full" (click)="gerarVeiculosMaisManutencoes()" [disabled]="carregando()">
+            @if (carregando()) { <span class="loading loading-spinner loading-xs"></span> }
+            @else { <i class="ti ti-file-type-pdf"></i> }
+            Gerar PDF
+          </button>
+        </div>
+      </div>
+
+      <div class="card bg-base-100 shadow">
+        <div class="card-body">
+          <div class="flex items-center gap-3 mb-2">
+            <i class="ti ti-chart-line text-success text-2xl"></i>
+            <h2 class="font-bold text-lg">Evolução de Gastos por Mês</h2>
+          </div>
+          <p class="text-base-content/60 text-sm mb-4">Evolução mensal dos custos com combustível e manutenção da frota.</p>
+          <button class="btn btn-primary gap-2 w-full" (click)="gerarGastosPorMes()" [disabled]="carregando()">
+            @if (carregando()) { <span class="loading loading-spinner loading-xs"></span> }
+            @else { <i class="ti ti-file-type-pdf"></i> }
+            Gerar PDF
+          </button>
+        </div>
+      </div>
+
+      <div class="card bg-base-100 shadow">
+        <div class="card-body">
+          <div class="flex items-center gap-3 mb-2">
+            <i class="ti ti-road text-primary text-2xl"></i>
+            <h2 class="font-bold text-lg">Custo por Km Rodado</h2>
+          </div>
+          <p class="text-base-content/60 text-sm mb-4">Eficiência de cada veículo calculando o custo total por km ou hora rodada.</p>
+          <button class="btn btn-primary gap-2 w-full" (click)="gerarCustoPorKm()" [disabled]="carregando()">
+            @if (carregando()) { <span class="loading loading-spinner loading-xs"></span> }
+            @else { <i class="ti ti-file-type-pdf"></i> }
+            Gerar PDF
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  }
+
+</div>  

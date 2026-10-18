@@ -1,0 +1,56 @@
+<div class="p-6">
+
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold">Histórico de Diário</h1>
+    <p class="text-base-content/60 text-sm">Visualize o trajeto percorrido por ID do diário</p>
+  </div>
+
+  <!-- Input de busca -->
+  <div class="card bg-base-100 shadow mb-6">
+    <div class="card-body">
+      <div class="flex gap-3">
+        <input
+          type="text"
+          class="input input-bordered flex-1"
+          placeholder="Cole o ID do diário aqui..."
+          [(ngModel)]="diarioId"
+          (keyup.enter)="buscar()" />
+        <button
+          class="btn btn-primary"
+          (click)="buscar()"
+          [disabled]="carregando()">
+          @if (carregando()) {
+            <span class="loading loading-spinner loading-sm"></span>
+          } @else {
+            <i class="ti ti-search"></i>
+          }
+          Buscar
+        </button>
+      </div>
+
+      @if (erro()) {
+        <div class="alert alert-error mt-3">
+          <i class="ti ti-alert-circle"></i>
+          <span>{{ erro() }}</span>
+        </div>
+      }
+
+      @if (totalPontos() > 0) {
+        <div class="flex items-center gap-2 mt-3">
+          <i class="ti ti-map-pin text-primary"></i>
+          <span class="text-sm text-base-content/60">{{ totalPontos() }} pontos de rastreamento encontrados</span>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Mapa -->
+  @if (totalPontos() > 0) {
+    <div class="card bg-base-100 shadow">
+      <div class="card-body p-0 overflow-hidden rounded-xl">
+        <div id="mapa-historico" style="height: 500px; width: 100%;"></div>
+      </div>
+    </div>
+  }
+
+</div>

@@ -1,0 +1,644 @@
+<div class="p-6">
+
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold">Cadastros</h1>
+      <p class="text-base-content/60 text-sm">Gerencie usuários, veículos, mecânicos e postos</p>
+    </div>
+  </div>
+
+  <!-- Abas -->
+  <div class="tabs tabs-bordered mb-6">
+    <button class="tab gap-2 text-base" [class.tab-active]="abaAtiva() === 'usuarios'" (click)="abaAtiva.set('usuarios')">
+      <i class="ti ti-users"></i> Usuários <span class="badge badge-sm">{{ usuarios().length }}</span>
+    </button>
+    <button class="tab gap-2 text-base" [class.tab-active]="abaAtiva() === 'veiculos'" (click)="abaAtiva.set('veiculos')">
+      <i class="ti ti-truck"></i> Veículos <span class="badge badge-sm">{{ veiculos().length }}</span>
+    </button>
+    <button class="tab gap-2 text-base" [class.tab-active]="abaAtiva() === 'mecanicos'" (click)="abaAtiva.set('mecanicos')">
+      <i class="ti ti-tool"></i> Mecânicos <span class="badge badge-sm">{{ mecanicos().length }}</span>
+    </button>
+    <button class="tab gap-2 text-base" [class.tab-active]="abaAtiva() === 'postos'" (click)="abaAtiva.set('postos')">
+      <i class="ti ti-building-store"></i> Postos <span class="badge badge-sm">{{ postos().length }}</span>
+    </button>
+    <button class="tab gap-2 text-base" [class.tab-active]="abaAtiva() === 'checklist'" (click)="abaAtiva.set('checklist')">
+  <i class="ti ti-checklist"></i> Checklist <span class="badge badge-sm">{{ templateAtivo()?.itens?.length ?? 0 }}</span>
+</button>
+  </div>
+
+  <!-- ABA: Usuários -->
+  @if (abaAtiva() === 'usuarios') {
+    <div class="flex justify-between items-center mb-4">
+      <label class="input input-bordered flex items-center gap-2 w-80">
+        <i class="ti ti-search text-base-content/40"></i>
+        <input type="text" class="grow" placeholder="Buscar por nome, login ou secretaria..."
+          [ngModel]="buscaUsuario()" (ngModelChange)="buscaUsuario.set($event)" />
+      </label>
+      <button class="btn btn-primary gap-2" (click)="abrirModalUsuario()">
+        <i class="ti ti-plus"></i> Novo Usuário
+      </button>
+    </div>
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        @if (carregandoUsuarios()) {
+          <div class="flex justify-center py-16"><span class="loading loading-spinner loading-lg text-primary"></span></div>
+        } @else if (usuariosFiltrados().length === 0) {
+          <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
+            <i class="ti ti-users text-6xl"></i><p class="font-medium">Nenhum usuário encontrado</p>
+          </div>
+        } @else {
+          <div class="overflow-x-auto">
+            <table class="table table-zebra table-hover">
+              <thead>
+                <tr>
+                  <th>Nome</th><th>Login</th><th>Perfil</th><th>Matrícula</th>
+                  <th>Secretaria</th><th>Vínculo</th><th class="text-center">Status</th><th class="text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (u of usuariosFiltrados(); track u.id) {
+                  <tr>
+                    <td>
+                      <div class="flex items-center gap-3">
+                        @if (u.fotoPerfil) {
+                          <div class="avatar"><div class="w-9 h-9 rounded-full"><img [src]="'data:image/jpeg;base64,' + u.fotoPerfil" /></div></div>
+                        } @else {
+                          <div class="avatar placeholder"><div class="bg-primary text-primary-content rounded-full w-9 h-9"><span class="text-sm font-bold">{{ u.nomeCompleto.charAt(0) }}</span></div></div>
+                        }
+                        <p class="font-medium">{{ u.nomeCompleto }}</p>
+                      </div>
+                    </td>
+                    <td class="text-base-content/70">&#64;{{ u.login }}</td>
+                    <td><span class="badge {{ badgePerfil(u.perfil) }}">{{ labelPerfil(u.perfil) }}</span></td>
+                    <td class="text-sm text-base-content/70">{{ u.matricula ?? '-' }}</td>
+                    <td class="text-sm text-base-content/70">{{ u.secretariaNome ?? '-' }}</td>
+                    <td class="text-sm text-base-content/70">{{ u.vinculo ?? '-' }}</td>
+                    <td class="text-center">
+                      @if (u.ativo) { <span class="badge badge-success">Ativo</span> }
+                      @else { <span class="badge badge-ghost">Inativo</span> }
+                    </td>
+                    <td class="text-center">
+                      <div class="flex items-center justify-center gap-1">
+                        <button class="btn btn-ghost btn-xs" (click)="abrirModalEditar(u)"><i class="ti ti-edit"></i></button>
+                        <button class="btn btn-xs gap-1" [class.btn-error]="u.ativo" [class.btn-success]="!u.ativo" (click)="alterarAtivo(u)">
+                          <i class="ti" [class.ti-ban]="u.ativo" [class.ti-check]="!u.ativo"></i>
+                          {{ u.ativo ? 'Desativar' : 'Ativar' }}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ABA: Veículos -->
+  @if (abaAtiva() === 'veiculos') {
+    <div class="flex justify-between items-center mb-4">
+      <label class="input input-bordered flex items-center gap-2 w-80">
+        <i class="ti ti-search text-base-content/40"></i>
+        <input type="text" class="grow" placeholder="Buscar por descrição, placa ou marca..."
+          [ngModel]="buscaVeiculo()" (ngModelChange)="buscaVeiculo.set($event)" />
+      </label>
+      <button class="btn btn-primary gap-2" (click)="abrirModalVeiculo()">
+        <i class="ti ti-plus"></i> Novo Veículo
+      </button>
+    </div>
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        @if (carregandoVeiculos()) {
+          <div class="flex justify-center py-16"><span class="loading loading-spinner loading-lg text-primary"></span></div>
+        } @else if (veiculosFiltrados().length === 0) {
+          <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
+            <i class="ti ti-truck text-6xl"></i><p class="font-medium">Nenhum veículo encontrado</p>
+          </div>
+        } @else {
+          <div class="overflow-x-auto">
+            <table class="table table-zebra table-hover">
+              <thead>
+                <tr>
+                  <th>Descrição</th><th>Marca/Modelo</th><th>Ano</th><th>Placa</th>
+                  <th>Tipo</th><th>Medidor</th><th class="text-center">Status</th><th class="text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (v of veiculosFiltrados(); track v.id) {
+                  <tr>
+                    <td>
+                      <p class="font-medium">{{ v.descricao }}</p>
+                      @if (v.comboio) { <span class="badge badge-warning badge-xs mt-1">Comboio</span> }
+                    </td>
+                    <td class="text-sm">
+                      @if (v.marca || v.modelo) { <p class="font-medium">{{ v.marca ?? '' }} {{ v.modelo ?? '' }}</p> }
+                      @else { <span class="text-base-content/30">-</span> }
+                    </td>
+                    <td class="text-sm text-base-content/70">{{ v.ano ?? '-' }}</td>
+                    <td>
+                      @if (v.placa) { <span class="badge badge-outline">{{ v.placa }}</span> }
+                      @else { <span class="text-base-content/30">S/P</span> }
+                    </td>
+                    <td class="text-sm text-base-content/70">{{ v.tipoNome }}</td>
+                    <td class="font-medium">{{ v.medidorAtual }} {{ v.tipoMedidor === 'horimetro' ? 'h' : 'km' }}</td>
+                    <td class="text-center"><span class="badge {{ badgeStatusVeiculo(v.status) }}">{{ labelStatusVeiculo(v.status) }}</span></td>
+                    <td class="text-center">
+                      <div class="flex items-center justify-center gap-1">
+                        <button class="btn btn-ghost btn-xs" (click)="abrirModalVeiculo(v)"><i class="ti ti-edit"></i></button>
+                        @if (v.status !== 'inativo') {
+                          <button class="btn btn-ghost btn-xs text-error" (click)="inativarVeiculo(v)"><i class="ti ti-trash"></i></button>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ABA: Mecânicos -->
+  @if (abaAtiva() === 'mecanicos') {
+    <div class="flex justify-between items-center mb-4">
+      <label class="input input-bordered flex items-center gap-2 w-80">
+        <i class="ti ti-search text-base-content/40"></i>
+        <input type="text" class="grow" placeholder="Buscar por nome ou especialidade..."
+          [ngModel]="buscaMecanico()" (ngModelChange)="buscaMecanico.set($event)" />
+      </label>
+      <button class="btn btn-primary gap-2" (click)="abrirModalMecanico()">
+        <i class="ti ti-plus"></i> Novo Mecânico
+      </button>
+    </div>
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        @if (carregandoMecanicos()) {
+          <div class="flex justify-center py-16"><span class="loading loading-spinner loading-lg text-primary"></span></div>
+        } @else if (mecanicosFiltrados().length === 0) {
+          <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
+            <i class="ti ti-tool text-6xl"></i><p class="font-medium">Nenhum mecânico encontrado</p>
+          </div>
+        } @else {
+          <div class="overflow-x-auto">
+            <table class="table table-zebra table-hover">
+              <thead>
+                <tr><th>Nome</th><th>Especialidade</th><th>Telefone</th><th class="text-center">Status</th><th class="text-center">Ações</th></tr>
+              </thead>
+              <tbody>
+                @for (m of mecanicosFiltrados(); track m.id) {
+                  <tr>
+                    <td class="font-medium">{{ m.nome }}</td>
+                    <td class="text-sm text-base-content/70">{{ m.especialidade ?? '-' }}</td>
+                    <td class="text-sm text-base-content/70">{{ m.telefone ?? '-' }}</td>
+                    <td class="text-center">
+                      @if (m.ativo) { <span class="badge badge-success">Ativo</span> }
+                      @else { <span class="badge badge-ghost">Inativo</span> }
+                    </td>
+                    <td class="text-center">
+                      <div class="flex items-center justify-center gap-1">
+                        <button class="btn btn-ghost btn-xs" (click)="abrirModalMecanico(m)"><i class="ti ti-edit"></i></button>
+                        <button class="btn btn-xs gap-1" [class.btn-error]="m.ativo" [class.btn-success]="!m.ativo" (click)="alterarAtivoMecanico(m)">
+                          <i class="ti" [class.ti-ban]="m.ativo" [class.ti-check]="!m.ativo"></i>
+                          {{ m.ativo ? 'Desativar' : 'Ativar' }}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ABA: Postos -->
+  @if (abaAtiva() === 'postos') {
+    <div class="flex justify-between items-center mb-4">
+      <label class="input input-bordered flex items-center gap-2 w-80">
+        <i class="ti ti-search text-base-content/40"></i>
+        <input type="text" class="grow" placeholder="Buscar por nome ou cidade..."
+          [ngModel]="buscaPosto()" (ngModelChange)="buscaPosto.set($event)" />
+      </label>
+      <button class="btn btn-primary gap-2" (click)="abrirModalPosto()">
+        <i class="ti ti-plus"></i> Novo Posto
+      </button>
+    </div>
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        @if (carregandoPostos()) {
+          <div class="flex justify-center py-16"><span class="loading loading-spinner loading-lg text-primary"></span></div>
+        } @else if (postosFiltrados().length === 0) {
+          <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
+            <i class="ti ti-building-store text-6xl"></i><p class="font-medium">Nenhum posto encontrado</p>
+          </div>
+        } @else {
+          <div class="overflow-x-auto">
+            <table class="table table-zebra table-hover">
+              <thead>
+                <tr><th>Nome</th><th>Endereço</th><th>Cidade</th><th class="text-center">Status</th><th class="text-center">Ações</th></tr>
+              </thead>
+              <tbody>
+                @for (p of postosFiltrados(); track p.id) {
+                  <tr>
+                    <td class="font-medium">{{ p.nome }}</td>
+                    <td class="text-sm text-base-content/70">{{ p.endereco ?? '-' }}</td>
+                    <td class="text-sm text-base-content/70">{{ p.cidade ?? '-' }}</td>
+                    <td class="text-center">
+                      @if (p.ativo) { <span class="badge badge-success">Ativo</span> }
+                      @else { <span class="badge badge-ghost">Inativo</span> }
+                    </td>
+                    <td class="text-center">
+                      <div class="flex items-center justify-center gap-1">
+                        <button class="btn btn-ghost btn-xs" (click)="abrirModalPosto(p)"><i class="ti ti-edit"></i></button>
+                        <button class="btn btn-xs gap-1" [class.btn-error]="p.ativo" [class.btn-success]="!p.ativo" (click)="alterarAtivoPosto(p)">
+                          <i class="ti" [class.ti-ban]="p.ativo" [class.ti-check]="!p.ativo"></i>
+                          {{ p.ativo ? 'Desativar' : 'Ativar' }}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ABA: Checklist -->
+@if (abaAtiva() === 'checklist') {
+  <div class="flex justify-between items-center mb-4">
+    <div>
+      <h2 class="font-bold text-lg">{{ templateAtivo()?.nome ?? 'Vistoria Padrão' }}</h2>
+      <p class="text-sm text-base-content/60">Itens do checklist de vistoria</p>
+    </div>
+    <button class="btn btn-primary gap-2" (click)="abrirModalItem()">
+      <i class="ti ti-plus"></i> Novo Item
+    </button>
+  </div>
+  <div class="card bg-base-100 shadow">
+    <div class="card-body">
+      @if (carregandoChecklist()) {
+        <div class="flex justify-center py-16"><span class="loading loading-spinner loading-lg text-primary"></span></div>
+      } @else if (!templateAtivo() || templateAtivo()!.itens.length === 0) {
+        <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
+          <i class="ti ti-checklist text-6xl"></i>
+          <p class="font-medium">Nenhum item cadastrado</p>
+        </div>
+      } @else {
+        <div class="overflow-x-auto">
+          <table class="table table-zebra">
+            <thead>
+              <tr>
+                <th>Ordem</th><th>Descrição</th>
+                <th class="text-center">Obrigatório</th>
+                <th class="text-center">Status</th>
+                <th class="text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of templateAtivo()!.itens; track item.id) {
+                <tr>
+                  <td class="text-base-content/60">{{ item.ordem }}</td>
+                  <td class="font-medium">{{ item.descricao }}</td>
+                  <td class="text-center">
+                    @if (item.obrigatorio) { <span class="badge badge-error badge-sm">Obrigatório</span> }
+                    @else { <span class="badge badge-ghost badge-sm">Opcional</span> }
+                  </td>
+                  <td class="text-center">
+                    @if (item.ativo) { <span class="badge badge-success">Ativo</span> }
+                    @else { <span class="badge badge-ghost">Inativo</span> }
+                  </td>
+                  <td class="text-center">
+                    <button class="btn btn-xs gap-1"
+                      [class.btn-error]="item.ativo"
+                      [class.btn-success]="!item.ativo"
+                      (click)="alterarAtivoItem(item.id, item.ativo)">
+                      <i class="ti" [class.ti-ban]="item.ativo" [class.ti-check]="!item.ativo"></i>
+                      {{ item.ativo ? 'Desativar' : 'Ativar' }}
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+}
+
+</div>
+
+<!-- MODAL NOVO USUÁRIO -->
+@if (modalUsuario()) {
+  <div class="modal modal-open">
+    <div class="modal-box max-w-2xl">
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModalUsuario()"><i class="ti ti-x"></i></button>
+      <h3 class="font-bold text-lg mb-4">Novo Usuário</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="form-control sm:col-span-2">
+          <label class="label"><span class="label-text font-medium">Nome completo *</span></label>
+          <input type="text" class="input input-bordered" placeholder="Ex: João da Silva" [(ngModel)]="novoUsuario.nomeCompleto" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">CPF *</span></label>
+          <input type="text" class="input input-bordered" placeholder="000.000.000-00" [(ngModel)]="novoUsuario.cpf" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Telefone</span></label>
+          <input type="text" class="input input-bordered" placeholder="(41) 99999-9999" [(ngModel)]="novoUsuario.telefone" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Login *</span></label>
+          <input type="text" class="input input-bordered" placeholder="Ex: joao.silva" [(ngModel)]="novoUsuario.login" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Senha *</span></label>
+          <input type="password" class="input input-bordered" placeholder="Senha" [(ngModel)]="novoUsuario.senha" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Perfil *</span></label>
+          <select class="select select-bordered" [(ngModel)]="novoUsuario.perfil">
+            <option value="motorista">Motorista</option>
+            <option value="gestor">Gestor</option>
+          </select>
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Matrícula</span></label>
+          <input type="text" class="input input-bordered" placeholder="Ex: 123456" [(ngModel)]="novoUsuario.matricula" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Vínculo</span></label>
+          <select class="select select-bordered" [(ngModel)]="novoUsuario.vinculo">
+            <option value="">Selecione</option>
+            @for (v of vinculos; track v) { <option [value]="v">{{ v }}</option> }
+          </select>
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Secretaria</span></label>
+          <select class="select select-bordered" [(ngModel)]="novoUsuario.secretariaId">
+            <option [value]="null">Selecione</option>
+            @for (s of secretarias(); track s.id) { <option [value]="s.id">{{ s.nome }}</option> }
+          </select>
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Categoria CNH</span></label>
+          <select class="select select-bordered" [(ngModel)]="novoUsuario.categoriaCnh">
+            <option value="">Selecione</option>
+            @for (c of categoriasCnh; track c) { <option [value]="c">{{ c }}</option> }
+          </select>
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Validade CNH</span></label>
+          <input type="date" class="input input-bordered" [(ngModel)]="novoUsuario.validadeCnh" />
+        </div>
+      </div>
+      <div class="modal-action">
+        <button class="btn btn-ghost" (click)="fecharModalUsuario()">Cancelar</button>
+        <button class="btn btn-primary gap-2" (click)="salvarUsuario()" [disabled]="salvandoUsuario()">
+          @if (salvandoUsuario()) { <span class="loading loading-spinner loading-xs"></span> }
+          <i class="ti ti-device-floppy"></i> Salvar
+        </button>
+      </div>
+    </div>
+    <div class="modal-backdrop" (click)="fecharModalUsuario()"></div>
+  </div>
+}
+
+<!-- MODAL EDITAR USUÁRIO -->
+@if (modalEditarUsuario()) {
+  <div class="modal modal-open">
+    <div class="modal-box max-w-2xl">
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModalEditar()"><i class="ti ti-x"></i></button>
+      <h3 class="font-bold text-lg mb-1">Editar Usuário</h3>
+      <p class="text-sm text-base-content/60 mb-4">&#64;{{ usuarioEditando()?.login }}</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="form-control sm:col-span-2">
+          <label class="label"><span class="label-text font-medium">Nome completo</span></label>
+          <input type="text" class="input input-bordered" [(ngModel)]="editarUsuarioForm.nomeCompleto" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Telefone</span></label>
+          <input type="text" class="input input-bordered" placeholder="(41) 99999-9999" [(ngModel)]="editarUsuarioForm.telefone" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Matrícula</span></label>
+          <input type="text" class="input input-bordered" [(ngModel)]="editarUsuarioForm.matricula" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Vínculo</span></label>
+          <select class="select select-bordered" [(ngModel)]="editarUsuarioForm.vinculo">
+            <option value="">Selecione</option>
+            @for (v of vinculos; track v) { <option [value]="v">{{ v }}</option> }
+          </select>
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Secretaria</span></label>
+          <select class="select select-bordered" [(ngModel)]="editarUsuarioForm.secretariaId">
+            <option [value]="null">Selecione</option>
+            @for (s of secretarias(); track s.id) { <option [value]="s.id">{{ s.nome }}</option> }
+          </select>
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Categoria CNH</span></label>
+          <select class="select select-bordered" [(ngModel)]="editarUsuarioForm.categoriaCnh">
+            <option value="">Selecione</option>
+            @for (c of categoriasCnh; track c) { <option [value]="c">{{ c }}</option> }
+          </select>
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Validade CNH</span></label>
+          <input type="date" class="input input-bordered" [(ngModel)]="editarUsuarioForm.validadeCnh" />
+        </div>
+      </div>
+      <div class="modal-action">
+        <button class="btn btn-ghost" (click)="fecharModalEditar()">Cancelar</button>
+        <button class="btn btn-primary gap-2" (click)="salvarEdicaoUsuario()" [disabled]="salvandoUsuario()">
+          @if (salvandoUsuario()) { <span class="loading loading-spinner loading-xs"></span> }
+          <i class="ti ti-device-floppy"></i> Salvar
+        </button>
+      </div>
+    </div>
+    <div class="modal-backdrop" (click)="fecharModalEditar()"></div>
+  </div>
+}
+
+<!-- MODAL VEÍCULO -->
+@if (modalVeiculo()) {
+  <div class="modal modal-open">
+    <div class="modal-box max-w-2xl">
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModalVeiculo()"><i class="ti ti-x"></i></button>
+      <h3 class="font-bold text-lg mb-4">{{ veiculoEditando() ? 'Editar Veículo' : 'Novo Veículo' }}</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        @if (!veiculoEditando()) {
+          <div class="form-control sm:col-span-2">
+            <label class="label"><span class="label-text font-medium">Tipo *</span></label>
+            <select class="select select-bordered" [(ngModel)]="novoVeiculo.tipoId">
+              <option value="">Selecione o tipo</option>
+              @for (t of tiposVeiculo; track t.id) { <option [value]="t.id">{{ t.nome }}</option> }
+            </select>
+          </div>
+        }
+        <div class="form-control sm:col-span-2">
+          <label class="label"><span class="label-text font-medium">Descrição *</span></label>
+          <input type="text" class="input input-bordered" placeholder="Ex: Caminhão Basculante" [(ngModel)]="novoVeiculo.descricao" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Marca</span></label>
+          <input type="text" class="input input-bordered" placeholder="Ex: MERCEDES" [(ngModel)]="novoVeiculo.marca" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Modelo</span></label>
+          <input type="text" class="input input-bordered" placeholder="Ex: ATEGO 1719" [(ngModel)]="novoVeiculo.modelo" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Ano</span></label>
+          <input type="number" class="input input-bordered" placeholder="Ex: 2020" [(ngModel)]="novoVeiculo.ano" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Cor</span></label>
+          <input type="text" class="input input-bordered" placeholder="Ex: BRANCA" [(ngModel)]="novoVeiculo.cor" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Placa</span></label>
+          <input type="text" class="input input-bordered" placeholder="Ex: ABC-1234" [(ngModel)]="novoVeiculo.placa" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">RENAVAM</span></label>
+          <input type="text" class="input input-bordered" placeholder="Ex: 00123456789" [(ngModel)]="novoVeiculo.renavam" />
+        </div>
+        <div class="form-control sm:col-span-2">
+          <label class="label"><span class="label-text font-medium">Chassi</span></label>
+          <input type="text" class="input input-bordered" placeholder="Ex: 9BM..." [(ngModel)]="novoVeiculo.chassi" />
+        </div>
+        <div class="form-control sm:col-span-2">
+          <label class="label cursor-pointer justify-start gap-3">
+            <input type="checkbox" class="toggle toggle-primary" [(ngModel)]="novoVeiculo.comboio" />
+            <div>
+              <span class="label-text font-medium">Caminhão Comboio</span>
+              <p class="text-xs text-base-content/50">Veículo que abastece outros no campo</p>
+            </div>
+          </label>
+        </div>
+        @if (!veiculoEditando()) {
+          <div class="form-control">
+            <label class="label"><span class="label-text font-medium">Medidor inicial</span></label>
+            <input type="number" class="input input-bordered" min="0" [(ngModel)]="novoVeiculo.medidorAtual" />
+          </div>
+        }
+      </div>
+      <div class="modal-action">
+        <button class="btn btn-ghost" (click)="fecharModalVeiculo()">Cancelar</button>
+        <button class="btn btn-primary gap-2" (click)="salvarVeiculo()" [disabled]="salvandoVeiculo()">
+          @if (salvandoVeiculo()) { <span class="loading loading-spinner loading-xs"></span> }
+          <i class="ti ti-device-floppy"></i> Salvar
+        </button>
+      </div>
+    </div>
+    <div class="modal-backdrop" (click)="fecharModalVeiculo()"></div>
+  </div>
+}
+
+<!-- MODAL MECÂNICO -->
+@if (modalMecanico()) {
+  <div class="modal modal-open">
+    <div class="modal-box max-w-lg">
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModalMecanico()"><i class="ti ti-x"></i></button>
+      <h3 class="font-bold text-lg mb-4">{{ mecanicoEditando() ? 'Editar Mecânico' : 'Novo Mecânico' }}</h3>
+      <div class="grid grid-cols-1 gap-4">
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Nome *</span></label>
+          <input type="text" class="input input-bordered" placeholder="Ex: JOSÉ DA SILVA" [(ngModel)]="novoMecanico.nome" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Especialidade</span></label>
+          <input type="text" class="input input-bordered" placeholder="Ex: MOTOR E CÂMBIO" [(ngModel)]="novoMecanico.especialidade" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Telefone</span></label>
+          <input type="text" class="input input-bordered" placeholder="(41) 99999-9999" [(ngModel)]="novoMecanico.telefone" />
+        </div>
+      </div>
+      <div class="modal-action">
+        <button class="btn btn-ghost" (click)="fecharModalMecanico()">Cancelar</button>
+        <button class="btn btn-primary gap-2" (click)="salvarMecanico()" [disabled]="salvandoMecanico()">
+          @if (salvandoMecanico()) { <span class="loading loading-spinner loading-xs"></span> }
+          <i class="ti ti-device-floppy"></i> Salvar
+        </button>
+      </div>
+    </div>
+    <div class="modal-backdrop" (click)="fecharModalMecanico()"></div>
+  </div>
+}
+
+<!-- MODAL POSTO -->
+@if (modalPosto()) {
+  <div class="modal modal-open">
+    <div class="modal-box max-w-lg">
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModalPosto()"><i class="ti ti-x"></i></button>
+      <h3 class="font-bold text-lg mb-4">{{ postoEditando() ? 'Editar Posto' : 'Novo Posto' }}</h3>
+      <div class="grid grid-cols-1 gap-4">
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Nome *</span></label>
+          <input type="text" class="input input-bordered" placeholder="Ex: POSTO CENTRAL" [(ngModel)]="novoPosto.nome" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Endereço</span></label>
+          <input type="text" class="input input-bordered" placeholder="Ex: Rua das Flores, 123" [(ngModel)]="novoPosto.endereco" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Cidade</span></label>
+          <input type="text" class="input input-bordered" placeholder="Ex: CRUZ MACHADO" [(ngModel)]="novoPosto.cidade" />
+        </div>
+      </div>
+      <div class="modal-action">
+        <button class="btn btn-ghost" (click)="fecharModalPosto()">Cancelar</button>
+        <button class="btn btn-primary gap-2" (click)="salvarPosto()" [disabled]="salvandoPosto()">
+          @if (salvandoPosto()) { <span class="loading loading-spinner loading-xs"></span> }
+          <i class="ti ti-device-floppy"></i> Salvar
+        </button>
+      </div>
+    </div>
+    <div class="modal-backdrop" (click)="fecharModalPosto()"></div>
+  </div>
+}
+@if (modalItem()) {
+  <div class="modal modal-open">
+    <div class="modal-box max-w-lg">
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModalItem()"><i class="ti ti-x"></i></button>
+      <h3 class="font-bold text-lg mb-4">Novo Item de Checklist</h3>
+      <div class="grid grid-cols-1 gap-4">
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Descrição *</span></label>
+          <input type="text" class="input input-bordered" placeholder="Ex: Verificar nível de óleo" [(ngModel)]="novoItem.descricao" />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Ordem</span></label>
+          <input type="number" class="input input-bordered" min="1" [(ngModel)]="novoItem.ordem" />
+        </div>
+        <div class="form-control">
+          <label class="label cursor-pointer justify-start gap-3">
+            <input type="checkbox" class="toggle toggle-primary" [(ngModel)]="novoItem.obrigatorio" />
+            <span class="label-text font-medium">Item obrigatório</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-action">
+        <button class="btn btn-ghost" (click)="fecharModalItem()">Cancelar</button>
+        <button class="btn btn-primary gap-2" (click)="salvarItem()" [disabled]="salvandoItem()">
+          @if (salvandoItem()) { <span class="loading loading-spinner loading-xs"></span> }
+          <i class="ti ti-device-floppy"></i> Salvar
+        </button>
+      </div>
+    </div>
+    <div class="modal-backdrop" (click)="fecharModalItem()"></div>
+  </div>
+}

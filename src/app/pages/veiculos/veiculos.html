@@ -1,0 +1,128 @@
+<div class="p-6">
+
+  <!-- Cabeçalho -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold">Veículos</h1>
+      <p class="text-sm text-base-content/60 mt-1">Gerencie a frota de veículos e máquinas</p>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="card bg-base-100 shadow mb-4">
+    <div class="card-body p-4">
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+
+        <label class="input input-bordered flex items-center gap-2 sm:col-span-2">
+          <i class="ti ti-search text-base-content/40"></i>
+          <input
+            type="text"
+            class="grow"
+            placeholder="Buscar por descrição ou placa..."
+            [ngModel]="busca()"
+            (ngModelChange)="busca.set($event)" />
+        </label>
+
+        <select
+          class="select select-bordered w-full"
+          [ngModel]="filtroStatus()"
+          (ngModelChange)="filtroStatus.set($event)">
+          <option value="">Todos os status</option>
+          <option value="disponivel">Disponível</option>
+          <option value="em_uso">Em uso</option>
+          <option value="inativo">Inativo</option>
+        </select>
+
+        <button class="btn btn-outline" (click)="limparFiltros()">
+          <i class="ti ti-filter-off"></i>
+          Limpar filtros
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Lista -->
+  <div class="card bg-base-100 shadow">
+    <div class="card-body">
+
+      @if (carregando()) {
+        <div class="flex justify-center py-16">
+          <span class="loading loading-spinner loading-lg text-primary"></span>
+        </div>
+
+      } @else if (veiculosFiltrados().length === 0) {
+        <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
+          <i class="ti ti-truck text-6xl"></i>
+          <p class="font-medium">Nenhum veículo encontrado</p>
+          <button class="btn btn-ghost btn-sm" (click)="limparFiltros()">Limpar filtros</button>
+        </div>
+
+      } @else {
+        <div class="overflow-x-auto">
+          <table class="table table-zebra table-hover">
+            <thead>
+              <tr>
+                <th>Descrição</th>
+    <th>Marca/Modelo</th>
+    <th>Ano</th>
+    <th>Placa</th>
+    <th>Tipo</th>
+    <th>Status</th>
+    <th>Medidor</th>
+                <th class="text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (v of veiculosPaginados(); track v.id) {
+                <tr class="cursor-pointer hover" (click)="verDetalhe(v.id!)">
+  <td>
+    <div class="flex items-center gap-3">
+      <div class="shrink-0" [innerHTML]="getSvgVeiculo(v.tipoNome)"></div>
+      <span class="font-medium">{{ v.descricao }}</span>
+    </div>
+  </td>
+  <td class="text-sm">
+    @if (v.marca || v.modelo) {
+      <p class="font-medium">{{ v.marca ?? '' }} {{ v.modelo ?? '' }}</p>
+    } @else {
+      <span class="text-base-content/30">-</span>
+    }
+  </td>
+  <td class="text-sm text-base-content/70">{{ v.ano ?? '-' }}</td>
+  <td>
+    @if (v.placa) {
+      <span class="badge badge-outline">{{ v.placa }}</span>
+    } @else {
+      <span class="text-base-content/30 text-sm">S/P</span>
+    }
+  </td>
+  <td class="text-sm text-base-content/70">{{ v.tipoNome }}</td>
+  <td>
+    <span class="badge {{ badgeStatus(v.status) }}">
+      {{ labelStatus(v.status) }}
+    </span>
+  </td>
+  <td class="font-medium">{{ getMedidor(v) }}</td>
+  <td class="text-center">
+    <button class="btn btn-ghost btn-xs" (click)="verDetalhe(v.id!); $event.stopPropagation()">
+      <i class="ti ti-eye"></i>
+    </button>
+  </td>
+</tr>
+              }
+            </tbody>
+          </table>
+          <app-paginacao
+  [total]="veiculosFiltrados().length"
+  [pagina]="paginaAtual()"
+  [porPagina]="porPagina"
+  (paginaMudou)="mudarPagina($event)">
+</app-paginacao>
+        </div>
+      }
+
+    </div>
+  </div>
+
+</div>

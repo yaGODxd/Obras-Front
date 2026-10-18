@@ -1,0 +1,191 @@
+<div class="p-6">
+
+  <!-- Cabeçalho -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold">Logs do Sistema</h1>
+      <p class="text-base-content/60 text-sm">Histórico de ações realizadas no sistema</p>
+    </div>
+  </div>
+
+  <!-- Cards resumo -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+
+    <div class="card bg-primary text-primary-content shadow">
+      <div class="card-body p-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm opacity-80">Total de registros</p>
+            <p class="text-3xl font-bold mt-1">{{ logsFiltrados().length }}</p>
+          </div>
+          <i class="ti ti-history text-4xl opacity-60"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-success text-success-content shadow">
+      <div class="card-body p-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm opacity-80">Logins</p>
+            <p class="text-3xl font-bold mt-1">{{ logs().filter(l => l.acao === 'LOGIN').length }}</p>
+          </div>
+          <i class="ti ti-login text-4xl opacity-60"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-error text-error-content shadow">
+      <div class="card-body p-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm opacity-80">Ocorrências</p>
+            <p class="text-3xl font-bold mt-1">{{ logs().filter(l => l.acao === 'OCORRENCIA').length }}</p>
+          </div>
+          <i class="ti ti-alert-triangle text-4xl opacity-60"></i>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Filtros -->
+  <div class="card bg-base-100 shadow mb-4">
+    <div class="card-body p-4">
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+
+        <label class="input input-bordered flex items-center gap-2 sm:col-span-2">
+          <i class="ti ti-search text-base-content/40"></i>
+          <input
+            type="text"
+            class="grow"
+            placeholder="Buscar por usuário ou descrição..."
+            [ngModel]="busca()"
+            (ngModelChange)="busca.set($event)" />
+        </label>
+
+        <select
+          class="select select-bordered w-full"
+          [ngModel]="filtroAcao()"
+          (ngModelChange)="filtroAcao.set($event)">
+          <option value="">Todas as ações</option>
+          @for (acao of acoes; track acao) {
+            <option [value]="acao">{{ getLabelAcao(acao) }}</option>
+          }
+        </select>
+
+        <button class="btn btn-outline" (click)="limparFiltros()">
+          <i class="ti ti-filter-off"></i>
+          Limpar
+        </button>
+
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+        <div>
+          <label class="label"><span class="label-text text-xs">Data início</span></label>
+          <input
+            type="date"
+            class="input input-bordered w-full"
+            [ngModel]="filtroInicio()"
+            (ngModelChange)="filtroInicio.set($event)" />
+        </div>
+        <div>
+          <label class="label"><span class="label-text text-xs">Data fim</span></label>
+          <input
+            type="date"
+            class="input input-bordered w-full"
+            [ngModel]="filtroFim()"
+            (ngModelChange)="filtroFim.set($event)" />
+        </div>
+      </div>
+
+      <div class="flex justify-end mt-3">
+        <button class="btn btn-primary btn-sm gap-2" (click)="aplicarFiltros()">
+          <i class="ti ti-search"></i>
+          Filtrar por período
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Lista -->
+  <div class="card bg-base-100 shadow">
+    <div class="card-body">
+
+      @if (carregando()) {
+        <div class="flex justify-center py-16">
+          <span class="loading loading-spinner loading-lg text-primary"></span>
+        </div>
+
+      } @else if (logsFiltrados().length === 0) {
+        <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
+          <i class="ti ti-history text-6xl"></i>
+          <p class="font-medium">Nenhum log encontrado</p>
+        </div>
+
+      } @else {
+        <div class="overflow-x-auto">
+          <table class="table table-zebra">
+            <thead>
+              <tr>
+                <th>Data/Hora</th>
+                <th>Usuário</th>
+                <th>Ação</th>
+                <th>Descrição</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (l of logsPaginados(); track l.id) {
+                <tr>
+                  <td class="text-sm">
+                    {{ l.criadoEm | date:'dd/MM/yyyy' }}
+                    <p class="text-xs text-base-content/40">{{ l.criadoEm | date:'HH:mm:ss' }}</p>
+                  </td>
+                  <td>
+  <div class="flex items-center gap-2">
+    @if (l.usuarioFoto) {
+      <div class="avatar">
+        <div class="w-8 h-8 rounded-full">
+          <img [src]="'data:image/jpeg;base64,' + l.usuarioFoto" alt="Foto" />
+        </div>
+      </div>
+    } @else {
+      <div class="avatar placeholder">
+        <div class="bg-primary text-primary-content rounded-full w-8 h-8">
+          <span class="text-xs font-bold">
+            {{ (l.usuarioNome ?? l.usuarioLogin).charAt(0).toUpperCase() }}
+          </span>
+        </div>
+      </div>
+    }
+    <div>
+      <p class="font-medium text-sm">{{ l.usuarioNome ?? l.usuarioLogin }}</p>
+      <p class="text-xs text-base-content/40">&#64;{{ l.usuarioLogin }}</p>
+    </div>
+  </div>
+</td>
+                  <td>
+                    <span class="badge {{ getCorAcao(l.acao) }}">
+                      {{ getLabelAcao(l.acao) }}
+                    </span>
+                  </td>
+                  <td class="text-sm text-base-content/70">{{ l.descricao }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          <app-paginacao
+  [total]="logsFiltrados().length"
+  [pagina]="paginaAtual()"
+  [porPagina]="porPagina"
+  (paginaMudou)="mudarPagina($event)">
+</app-paginacao>
+        </div>
+      }
+
+    </div>
+  </div>
+
+</div>

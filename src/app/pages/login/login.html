@@ -1,0 +1,61 @@
+<div class="min-h-screen flex items-center justify-center bg-base-200">
+  <div class="card w-full max-w-sm shadow-xl bg-base-100">
+    <div class="card-body">
+
+      <div class="flex justify-center mb-4">
+        <i class="ti ti-truck text-6xl text-primary"></i>
+      </div>
+
+      <h2 class="card-title justify-center text-2xl mb-2">Sistema de Frotas</h2>
+      <p class="text-center text-sm text-base-content/60 mb-4">Secretaria de Obras — Cruz Machado/PR</p>
+
+      @if (erro) {
+        <div class="alert alert-error">
+          <i class="ti ti-alert-circle"></i>
+          <span>{{ erro }}</span>
+        </div>
+      }
+
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Usuário</legend>
+        <label class="input w-full">
+          <i class="ti ti-user"></i>
+          <input
+            type="text"
+            placeholder="Digite seu login"
+            [(ngModel)]="login"
+            (keyup.enter)="entrar()" />
+        </label>
+      </fieldset>
+
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Senha</legend>
+        <label class="input w-full">
+          <i class="ti ti-lock"></i>
+          <input
+            [type]="senhaVisivel ? 'text' : 'password'"
+            placeholder="Digite sua senha"
+            [(ngModel)]="senha"
+            (keyup.enter)="entrar()" />
+          <button type="button" (click)="toggleSenha()">
+            <i class="ti ti-eye{{ senhaVisivel ? '-off' : '' }}"></i>
+          </button>
+        </label>
+      </fieldset>
+
+      <button
+        class="btn btn-primary w-full mt-4"
+        (click)="entrar()"
+        [disabled]="carregando">
+        @if (carregando) {
+          <span class="loading loading-spinner loading-sm"></span>
+          Entrando...
+        } @else {
+          <i class="ti ti-login"></i>
+          Entrar
+        }
+      </button>
+
+    </div>
+  </div>
+</div>

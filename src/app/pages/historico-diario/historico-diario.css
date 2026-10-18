@@ -1,0 +1,10 @@
+/* Garante que o container do Leaflet ocupe 100% da área disponível */
+#mapa-frota {
+  height: 100%;
+  width: 100%;
+}
+
+/* Remove painel de instruções do Leaflet Routing Machine (evita ícone quebrado) */
+.leaflet-routing-container {
+  display: none !important;
+}
