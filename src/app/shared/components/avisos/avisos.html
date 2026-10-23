@@ -1,0 +1,13 @@
+<div class="toast toast-end toast-bottom z-[2000]" role="status" aria-live="polite">
+  @for (aviso of avisosService.avisos(); track aviso.id) {
+    <div class="alert shadow-lg max-w-sm"
+      [class.alert-success]="aviso.tipo === 'sucesso'"
+      [class.alert-error]="aviso.tipo === 'erro'">
+      <i class="ti" [class.ti-circle-check]="aviso.tipo === 'sucesso'" [class.ti-alert-circle]="aviso.tipo === 'erro'"></i>
+      <span class="whitespace-normal">{{ aviso.texto }}</span>
+      <button class="btn btn-ghost btn-xs btn-circle" aria-label="Fechar aviso" (click)="avisosService.fechar(aviso.id)">
+        <i class="ti ti-x"></i>
+      </button>
+    </div>
+  }
+</div>

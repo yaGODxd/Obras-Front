@@ -16,7 +16,7 @@
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
               <h1 class="text-lg font-bold">{{ v.descricao }}</h1>
-              <span class="badge badge-sm" [class]="badgeStatus(v.status)">{{ labelStatus(v.status) }}</span>
+              <app-status-badge [texto]="labelStatus(v.status)" [cor]="'badge-sm ' + badgeStatus(v.status)" />
             </div>
             <div class="flex gap-4 mt-1 flex-wrap">
               @if (v.placa) {
@@ -83,19 +83,7 @@
         @if (motoristaMaisUsou(); as m) {
           <div class="card bg-base-100 shadow-sm">
             <div class="card-body p-4 flex-row items-center gap-3">
-              @if (m.fotoPerfil) {
-                <div class="avatar shrink-0">
-                  <div class="w-10 h-10 rounded-full">
-                    <img [src]="usuarioService.getFotoUrl(m.fotoPerfil)" alt="Foto" />
-                  </div>
-                </div>
-              } @else {
-                <div class="avatar placeholder shrink-0">
-                  <div class="w-10 h-10 rounded-full bg-primary text-primary-content">
-                    <span class="text-sm font-bold">{{ getIniciais(m.nomeCompleto) }}</span>
-                  </div>
-                </div>
-              }
+              <app-avatar [foto]="m.fotoPerfil" [nome]="m.nomeCompleto" [tamanho]="10" [iniciais]="getIniciais(m.nomeCompleto)" />
               <div class="min-w-0">
                 <p class="text-xs text-base-content/50">Mais utiliza</p>
                 <p class="font-semibold text-sm truncate">{{ m.nomeCompleto }}</p>
@@ -109,19 +97,7 @@
         @if (ultimoMotorista(); as m) {
           <div class="card bg-base-100 shadow-sm">
             <div class="card-body p-4 flex-row items-center gap-3">
-              @if (m.fotoPerfil) {
-                <div class="avatar shrink-0">
-                  <div class="w-10 h-10 rounded-full">
-                    <img [src]="usuarioService.getFotoUrl(m.fotoPerfil)" alt="Foto" />
-                  </div>
-                </div>
-              } @else {
-                <div class="avatar placeholder shrink-0">
-                  <div class="w-10 h-10 rounded-full bg-success text-success-content">
-                    <span class="text-sm font-bold">{{ getIniciais(m.nomeCompleto) }}</span>
-                  </div>
-                </div>
-              }
+              <app-avatar [foto]="m.fotoPerfil" [nome]="m.nomeCompleto" [tamanho]="10" [iniciais]="getIniciais(m.nomeCompleto)" cor="success" />
               <div class="min-w-0">
                 <p class="text-xs text-base-content/50">Último uso</p>
                 <p class="font-semibold text-sm truncate">{{ m.nomeCompleto }}</p>
@@ -200,9 +176,9 @@
                   <tbody>
                     @for (a of abastecimentos(); track a.id) {
                       <tr class="hover">
-                        <td class="text-xs text-base-content/60">{{ a.registradoEm | date:'dd/MM/yyyy HH:mm' }}</td>
+                        <td class="text-xs text-base-content/60">{{ a.registradoEm | date:'dd/MM/yyyy HH:mm' }} <app-selo-horario-suspeito [registro]="a" /></td>
                         <td class="text-sm">{{ a.motoristaNome }}</td>
-                        <td><span class="badge badge-sm" [class]="getCorCombustivel(a.tipoCombustivel)">{{ a.tipoCombustivel }}</span></td>
+                        <td><app-status-badge [texto]="a.tipoCombustivel" [cor]="'badge-sm ' + badgeCombustivel(a.tipoCombustivel)" /></td>
                         <td class="text-right text-sm">{{ a.litros | number:'1.1-1' }} L</td>
                         <td class="text-right text-sm font-medium">R$ {{ a.valorTotal | number:'1.2-2' }}</td>
                         <td class="text-sm text-base-content/60">{{ a.posto ?? '—' }}</td>
@@ -233,12 +209,13 @@
               <div class="flex flex-col gap-2">
                 @for (o of ocorrencias(); track o.id) {
                   <div class="flex items-start gap-3 p-3 rounded-lg bg-base-200 hover:bg-base-300 cursor-pointer transition-colors"
-                       (click)="abrirModalOcorrencia(o)">
-                    <span class="badge badge-sm mt-0.5" [class]="getCorTipo(o.tipo)">{{ o.tipo }}</span>
+                       appClicavel (click)="abrirModalOcorrencia(o)">
+                    <app-status-badge class="mt-0.5" [texto]="o.tipo" [cor]="'badge-sm ' + badgeTipoOcorrencia(o.tipo)" />
                     <div class="flex-1 min-w-0">
                       <p class="text-sm font-medium truncate">{{ o.descricao }}</p>
-                      <p class="text-xs text-base-content/50">{{ o.motoristaNome }} · {{ o.registradoEm | date:'dd/MM/yyyy HH:mm' }}</p>
+                      <p class="text-xs text-base-content/50">{{ o.motoristaNome }} · {{ o.registradoEm | date:'dd/MM/yyyy HH:mm' }} <app-selo-horario-suspeito [registro]="o" /></p>
                     </div>
+                    <app-status-badge class="shrink-0" [texto]="rotuloStatusOcorrencia(statusOcorrencia(o))" [cor]="'badge-sm ' + badgeStatusOcorrencia(statusOcorrencia(o))" />
                     @if (o.latitude && o.longitude) {
                       <i class="ti ti-map-pin text-primary text-sm shrink-0 mt-0.5"></i>
                     }
@@ -259,10 +236,10 @@
               <div class="flex flex-col gap-2">
                 @for (m of manutencoes(); track m.id) {
                   <div class="flex items-start gap-3 p-3 rounded-lg bg-base-200 hover:bg-base-300 cursor-pointer transition-colors"
-                       (click)="verManutencao(m.id)">
+                       appClicavel (click)="verManutencao(m.id)">
                     <div class="flex flex-col gap-1 shrink-0">
-                      <span class="badge badge-sm" [class]="badgeStatusManutencao(m.status)">{{ labelStatusManutencao(m.status) }}</span>
-                      <span class="badge badge-sm" [class]="badgeTipoManutencao(m.tipo)">{{ labelTipoManutencao(m.tipo) }}</span>
+                      <app-status-badge [texto]="labelStatusManutencao(m.status)" [cor]="'badge-sm ' + badgeStatusManutencao(m.status)" />
+                      <app-status-badge [texto]="labelTipoManutencao(m.tipo)" [cor]="'badge-sm ' + badgeTipoManutencao(m.tipo)" />
                     </div>
                     <div class="flex-1 min-w-0">
                       <p class="text-sm font-medium truncate">{{ m.descricao }}</p>
@@ -331,64 +308,29 @@
 </div>
 
 <!-- Modal ocorrência -->
-@if (ocorrenciaSelecionada()) {
-  <div class="modal modal-open">
-    <div class="modal-box max-w-lg">
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModalOcorrencia()">
-        <i class="ti ti-x"></i>
-      </button>
-      <h3 class="font-bold text-lg mb-4">Ocorrência</h3>
-      <div class="space-y-3">
-        <div class="flex justify-between items-center">
-          <span class="text-sm text-base-content/60">Tipo</span>
-          <span class="badge" [class]="getCorTipo(ocorrenciaSelecionada()!.tipo)">{{ ocorrenciaSelecionada()!.tipo }}</span>
-        </div>
-        <div class="flex justify-between items-center">
-          <span class="text-sm text-base-content/60">Motorista</span>
-          <span class="font-medium text-sm">{{ ocorrenciaSelecionada()!.motoristaNome }}</span>
-        </div>
-        <div class="flex justify-between items-center">
-          <span class="text-sm text-base-content/60">Data</span>
-          <span class="font-medium text-sm">{{ ocorrenciaSelecionada()!.registradoEm | date:'dd/MM/yyyy HH:mm' }}</span>
-        </div>
-        <div>
-          <p class="text-sm text-base-content/60 mb-1">Descrição</p>
-          <p class="text-sm bg-base-200 rounded-lg p-3">{{ ocorrenciaSelecionada()!.descricao }}</p>
-        </div>
-        @if (ocorrenciaSelecionada()!.latitude && ocorrenciaSelecionada()!.longitude) {
-          <div>
-            <p class="text-sm text-base-content/60 mb-2"><i class="ti ti-map-pin text-primary mr-1"></i>Local</p>
-            <div id="mapa-ocorrencia-detalhe" class="w-full rounded-lg border border-base-300" style="height:220px;"></div>
-          </div>
-        }
-      </div>
-      <div class="modal-action">
-        <button class="btn" (click)="fecharModalOcorrencia()">Fechar</button>
-      </div>
-    </div>
-    <div class="modal-backdrop" (click)="fecharModalOcorrencia()"></div>
-  </div>
+@if (ocorrenciaSelecionada(); as o) {
+  <app-modal-ocorrencia [ocorrencia]="o" [mostrarVeiculo]="false" (fechar)="fecharModalOcorrencia()" (statusAlterado)="aoAlterarStatusOcorrencia($event)" />
 }
 
 <!-- Modal período -->
 @if (modalPeriodo()) {
-  <div class="modal modal-open">
+  <div class="modal modal-open" appModal (fechar)="fecharModalPeriodo()">
     <div class="modal-box max-w-sm">
       <h3 class="font-bold text-lg mb-4">
         {{ modalPeriodo() === 'relatorio' ? 'Gerar relatório' : 'Relatório de peças' }}
       </h3>
       <div class="flex flex-col gap-3">
         <div class="form-control">
-          <label class="label"><span class="label-text text-sm">Data início</span></label>
-          <input type="date" class="input input-bordered input-sm"
+          <label class="label" for="periodoInicio"><span class="label-text text-sm">Data início</span></label>
+          <input id="periodoInicio" type="date" class="input input-bordered input-sm"
                  [value]="periodoInicio()"
-                 (change)="periodoInicio.set($any($event.target).value)" />
+                 (change)="periodoInicio.set(valorDoCampo($event))" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text text-sm">Data fim</span></label>
-          <input type="date" class="input input-bordered input-sm"
+          <label class="label" for="periodoFim"><span class="label-text text-sm">Data fim</span></label>
+          <input id="periodoFim" type="date" class="input input-bordered input-sm"
                  [value]="periodoFim()"
-                 (change)="periodoFim.set($any($event.target).value)" />
+                 (change)="periodoFim.set(valorDoCampo($event))" />
         </div>
       </div>
       <div class="modal-action">

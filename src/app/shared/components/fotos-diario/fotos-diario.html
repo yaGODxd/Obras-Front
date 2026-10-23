@@ -1,0 +1,45 @@
+@let e = estado();
+<div class="flex flex-wrap items-center justify-between gap-2 mt-4 mb-2">
+  <h4 class="font-semibold">Fotos</h4>
+  @if (!aberta()) {
+    <button type="button" class="btn btn-ghost btn-sm gap-1" (click)="abrir()">
+      <i class="ti ti-photo text-primary" aria-hidden="true"></i> Mostrar fotos
+    </button>
+  }
+</div>
+
+@if (aberta()) {
+  @if (e.tipo === 'carregando') {
+    <div class="flex justify-center py-6"><span class="loading loading-spinner loading-md text-primary" aria-label="Carregando fotos"></span></div>
+  } @else if (e.tipo === 'erro') {
+    <app-erro-carregar [mensagem]="e.mensagem" (tentarDeNovo)="carregar()" />
+  } @else if (e.fotos.length === 0) {
+    <p class="text-sm text-base-content/60">Nenhuma foto neste diário.</p>
+  } @else if (ampliada(); as f) {
+    <figure class="space-y-2">
+      <app-foto-miniatura [fotoId]="f.id" [alt]="rotuloTipo(f.tipo)" classe="w-full max-h-[60vh] object-contain rounded-lg bg-base-200" />
+      <figcaption class="flex flex-wrap items-center gap-2 text-sm">
+        <span class="font-medium">{{ rotuloTipo(f.tipo) }}</span>
+        @if (f.tiradaEm) { <span class="text-base-content/60">tirada em {{ f.tiradaEm | date:'dd/MM/yyyy HH:mm' }}</span> }
+        <span class="text-base-content/60">· {{ tamanho(f.tamanhoBytes) }}</span>
+      </figcaption>
+      <app-selo-horario-suspeito [registro]="f" [detalhado]="true" />
+      <button type="button" class="btn btn-ghost btn-sm gap-1" (click)="voltar()">
+        <i class="ti ti-arrow-left" aria-hidden="true"></i> Voltar às miniaturas
+      </button>
+    </figure>
+  } @else {
+    <ul class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+      @for (f of e.fotos; track f.id) {
+        <li>
+          <button type="button" class="w-full text-left rounded-lg focus-visible:outline-2" [attr.aria-label]="'Ampliar foto: ' + rotuloTipo(f.tipo)" (click)="ampliar(f)">
+            <app-foto-miniatura [fotoId]="f.id" [alt]="rotuloTipo(f.tipo)" />
+            <span class="block text-xs mt-1 truncate">{{ rotuloTipo(f.tipo) }}</span>
+            @if (f.tiradaEm) { <span class="block text-xs text-base-content/60">{{ f.tiradaEm | date:'HH:mm' }}</span> }
+          </button>
+          <app-selo-horario-suspeito [registro]="f" />
+        </li>
+      }
+    </ul>
+  }
+}

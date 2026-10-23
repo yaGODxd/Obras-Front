@@ -1,0 +1,98 @@
+@let o = ocorrencia();
+<div class="modal modal-open" appModal (fechar)="fechar.emit()">
+  <div class="modal-box max-w-2xl">
+
+    <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Fechar" (click)="fechar.emit()">
+      <i class="ti ti-x"></i>
+    </button>
+
+    <h3 class="font-bold text-lg mb-4">Detalhes da Ocorrência</h3>
+
+    <div class="space-y-3 mb-4">
+      <div class="flex justify-between items-center">
+        <span class="text-base-content/60 text-sm">Data</span>
+        <span class="font-medium">{{ o.registradoEm | date:'dd/MM/yyyy HH:mm' }}</span>
+      </div>
+      <app-selo-horario-suspeito [registro]="o" [detalhado]="true" />
+      @if (mostrarMotorista()) {
+        <div class="flex justify-between items-center">
+          <span class="text-base-content/60 text-sm">Motorista</span>
+          <span class="font-medium">{{ o.motoristaNome }}</span>
+        </div>
+      }
+      @if (mostrarVeiculo()) {
+        <div class="flex justify-between items-center">
+          <span class="text-base-content/60 text-sm">Veículo</span>
+          <span class="font-medium">{{ o.veiculoDescricao }}</span>
+        </div>
+        @if (o.veiculoPlaca) {
+          <div class="flex justify-between items-center">
+            <span class="text-base-content/60 text-sm">Placa</span>
+            <span class="badge badge-outline">{{ o.veiculoPlaca }}</span>
+          </div>
+        }
+      }
+      <div class="flex justify-between items-center">
+        <span class="text-base-content/60 text-sm">Tipo</span>
+        <app-status-badge [texto]="o.tipo" [cor]="badgeTipoOcorrencia(o.tipo)" />
+      </div>
+      <div class="flex justify-between items-center">
+        <span class="text-base-content/60 text-sm">Status</span>
+        <app-status-badge [texto]="rotuloStatus(statusAtual())" [cor]="badgeStatus(statusAtual())" />
+      </div>
+      @if (o.resolvidaEm) {
+        <div class="flex justify-between items-center">
+          <span class="text-base-content/60 text-sm">Resolvida em</span>
+          <span class="font-medium">{{ o.resolvidaEm | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+      }
+      @if (o.manutencoes?.length) {
+        <div class="flex justify-between items-center">
+          <span class="text-base-content/60 text-sm">Manutenções ligadas</span>
+          <span class="font-medium">{{ o.manutencoes!.length }}</span>
+        </div>
+      }
+      <div class="flex flex-wrap items-end gap-2">
+        <div class="form-control grow">
+          <label class="label" for="ocorrencia-status"><span class="label-text text-sm">Mudar status</span></label>
+          <select id="ocorrencia-status" class="select select-bordered select-sm" [ngModel]="statusEscolhido()" (ngModelChange)="statusEscolhido.set($event)">
+            @for (s of opcoesStatus; track s) {
+              <option [ngValue]="s">{{ rotuloStatus(s) }}</option>
+            }
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" [disabled]="salvandoStatus() || statusEscolhido() === statusAtual()" (click)="salvarStatus()">
+          @if (salvandoStatus()) { <span class="loading loading-spinner loading-xs"></span> }
+          Salvar status
+        </button>
+      </div>
+      <p class="text-xs text-base-content/50">O status também muda sozinho: em andamento ao abrir uma manutenção ligada, resolvida quando todas as ligadas terminam.</p>
+      <div class="divider my-1"></div>
+      <div>
+        <p class="text-base-content/60 text-sm mb-1">Descrição</p>
+        <p class="text-sm">{{ o.descricao }}</p>
+      </div>
+    </div>
+
+    @if (o.latitude && o.longitude) {
+      <div class="mt-4">
+        <p class="text-base-content/60 text-sm mb-2">
+          <i class="ti ti-map-pin mr-1"></i>
+          Local da ocorrência
+        </p>
+        <div #mapa style="height: 250px; border-radius: 12px; z-index: 0;"></div>
+      </div>
+    } @else {
+      <div class="mt-4 flex items-center gap-2 text-base-content/40">
+        <i class="ti ti-map-pin-off"></i>
+        <span class="text-sm">Sem localização registrada</span>
+      </div>
+    }
+
+    <div class="modal-action">
+      <button class="btn" (click)="fechar.emit()">Fechar</button>
+    </div>
+
+  </div>
+  <div class="modal-backdrop" (click)="fechar.emit()"></div>
+</div>

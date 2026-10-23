@@ -1,0 +1,24 @@
+@if (fotos().length) {
+  <div [class]="classe()">
+    <ul class="flex flex-wrap gap-2" aria-label="Fotos">
+      @for (f of fotos(); track f.id) {
+        <li>
+          <button type="button" class="block rounded-lg focus-visible:outline-2" [class.ring-2]="ampliada()?.id === f.id"
+            [attr.aria-label]="(ampliada()?.id === f.id ? 'Fechar foto: ' : 'Ampliar foto: ') + rotuloTipo(f.tipo)"
+            [attr.aria-expanded]="ampliada()?.id === f.id" (click)="alternar(f)">
+            <app-foto-miniatura [fotoId]="f.id" [alt]="rotuloTipo(f.tipo)" classe="w-14 h-14 object-cover rounded-lg" />
+          </button>
+        </li>
+      }
+    </ul>
+    @if (ampliada(); as f) {
+      <figure class="mt-2 space-y-1">
+        <app-foto-miniatura [fotoId]="f.id" [alt]="rotuloTipo(f.tipo)" classe="w-full max-h-[50vh] object-contain rounded-lg bg-base-200" />
+        <figcaption class="text-xs text-base-content/60">
+          {{ rotuloTipo(f.tipo) }}@if (f.tiradaEm) { · tirada em {{ f.tiradaEm | date:'dd/MM/yyyy HH:mm' }} }
+        </figcaption>
+        <app-selo-horario-suspeito [registro]="f" [detalhado]="true" />
+      </figure>
+    }
+  </div>
+}

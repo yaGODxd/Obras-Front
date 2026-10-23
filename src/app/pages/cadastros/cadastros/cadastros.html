@@ -31,7 +31,7 @@
     <div class="flex justify-between items-center mb-4">
       <label class="input input-bordered flex items-center gap-2 w-80">
         <i class="ti ti-search text-base-content/40"></i>
-        <input type="text" class="grow" placeholder="Buscar por nome, login ou secretaria..."
+        <input type="text" class="grow" placeholder="Buscar por nome, login ou secretaria..." aria-label="Buscar usuários"
           [ngModel]="buscaUsuario()" (ngModelChange)="buscaUsuario.set($event)" />
       </label>
       <button class="btn btn-primary gap-2" (click)="abrirModalUsuario()">
@@ -42,6 +42,8 @@
       <div class="card-body">
         @if (carregandoUsuarios()) {
           <div class="flex justify-center py-16"><span class="loading loading-spinner loading-lg text-primary"></span></div>
+        } @else if (erroUsuarios()) {
+          <app-erro-carregar [mensagem]="erroUsuarios()" (tentarDeNovo)="carregarUsuarios()" />
         } @else if (usuariosFiltrados().length === 0) {
           <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
             <i class="ti ti-users text-6xl"></i><p class="font-medium">Nenhum usuário encontrado</p>
@@ -60,26 +62,21 @@
                   <tr>
                     <td>
                       <div class="flex items-center gap-3">
-                        @if (u.fotoPerfil) {
-                          <div class="avatar"><div class="w-9 h-9 rounded-full"><img [src]="'data:image/jpeg;base64,' + u.fotoPerfil" /></div></div>
-                        } @else {
-                          <div class="avatar placeholder"><div class="bg-primary text-primary-content rounded-full w-9 h-9"><span class="text-sm font-bold">{{ u.nomeCompleto.charAt(0) }}</span></div></div>
-                        }
+                        <app-avatar [foto]="u.fotoPerfil" [nome]="u.nomeCompleto" />
                         <p class="font-medium">{{ u.nomeCompleto }}</p>
                       </div>
                     </td>
                     <td class="text-base-content/70">&#64;{{ u.login }}</td>
-                    <td><span class="badge {{ badgePerfil(u.perfil) }}">{{ labelPerfil(u.perfil) }}</span></td>
+                    <td><app-status-badge [texto]="labelPerfil(u.perfil)" [cor]="badgePerfil(u.perfil)" /></td>
                     <td class="text-sm text-base-content/70">{{ u.matricula ?? '-' }}</td>
                     <td class="text-sm text-base-content/70">{{ u.secretariaNome ?? '-' }}</td>
                     <td class="text-sm text-base-content/70">{{ u.vinculo ?? '-' }}</td>
                     <td class="text-center">
-                      @if (u.ativo) { <span class="badge badge-success">Ativo</span> }
-                      @else { <span class="badge badge-ghost">Inativo</span> }
+                      <app-status-badge [texto]="u.ativo ? 'Ativo' : 'Inativo'" [cor]="u.ativo ? 'badge-success' : 'badge-ghost'" />
                     </td>
                     <td class="text-center">
                       <div class="flex items-center justify-center gap-1">
-                        <button class="btn btn-ghost btn-xs" (click)="abrirModalEditar(u)"><i class="ti ti-edit"></i></button>
+                        <button class="btn btn-ghost btn-xs" [attr.aria-label]="'Editar ' + u.nomeCompleto" (click)="abrirModalEditar(u)"><i class="ti ti-edit"></i></button>
                         <button class="btn btn-xs gap-1" [class.btn-error]="u.ativo" [class.btn-success]="!u.ativo" (click)="alterarAtivo(u)">
                           <i class="ti" [class.ti-ban]="u.ativo" [class.ti-check]="!u.ativo"></i>
                           {{ u.ativo ? 'Desativar' : 'Ativar' }}
@@ -101,7 +98,7 @@
     <div class="flex justify-between items-center mb-4">
       <label class="input input-bordered flex items-center gap-2 w-80">
         <i class="ti ti-search text-base-content/40"></i>
-        <input type="text" class="grow" placeholder="Buscar por descrição, placa ou marca..."
+        <input type="text" class="grow" placeholder="Buscar por descrição, placa ou marca..." aria-label="Buscar veículos"
           [ngModel]="buscaVeiculo()" (ngModelChange)="buscaVeiculo.set($event)" />
       </label>
       <button class="btn btn-primary gap-2" (click)="abrirModalVeiculo()">
@@ -112,6 +109,8 @@
       <div class="card-body">
         @if (carregandoVeiculos()) {
           <div class="flex justify-center py-16"><span class="loading loading-spinner loading-lg text-primary"></span></div>
+        } @else if (erroVeiculos()) {
+          <app-erro-carregar [mensagem]="erroVeiculos()" (tentarDeNovo)="carregarVeiculos()" />
         } @else if (veiculosFiltrados().length === 0) {
           <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
             <i class="ti ti-truck text-6xl"></i><p class="font-medium">Nenhum veículo encontrado</p>
@@ -130,7 +129,7 @@
                   <tr>
                     <td>
                       <p class="font-medium">{{ v.descricao }}</p>
-                      @if (v.comboio) { <span class="badge badge-warning badge-xs mt-1">Comboio</span> }
+                      @if (v.comboio) { <app-status-badge class="mt-1" texto="Comboio" cor="badge-warning badge-xs" /> }
                     </td>
                     <td class="text-sm">
                       @if (v.marca || v.modelo) { <p class="font-medium">{{ v.marca ?? '' }} {{ v.modelo ?? '' }}</p> }
@@ -142,13 +141,15 @@
                       @else { <span class="text-base-content/30">S/P</span> }
                     </td>
                     <td class="text-sm text-base-content/70">{{ v.tipoNome }}</td>
-                    <td class="font-medium">{{ v.medidorAtual }} {{ v.tipoMedidor === 'horimetro' ? 'h' : 'km' }}</td>
-                    <td class="text-center"><span class="badge {{ badgeStatusVeiculo(v.status) }}">{{ labelStatusVeiculo(v.status) }}</span></td>
+                    <td class="font-medium">{{ medidor(v) }}</td>
+                    <td class="text-center"><app-status-badge [texto]="labelStatusVeiculo(v.status)" [cor]="badgeStatusVeiculo(v.status)" /></td>
                     <td class="text-center">
                       <div class="flex items-center justify-center gap-1">
-                        <button class="btn btn-ghost btn-xs" (click)="abrirModalVeiculo(v)"><i class="ti ti-edit"></i></button>
+                        <button class="btn btn-ghost btn-xs" [attr.aria-label]="'Editar ' + v.descricao" (click)="abrirModalVeiculo(v)"><i class="ti ti-edit"></i></button>
                         @if (v.status !== 'inativo') {
-                          <button class="btn btn-ghost btn-xs text-error" (click)="inativarVeiculo(v)"><i class="ti ti-trash"></i></button>
+                          <button class="btn btn-ghost btn-xs text-error" [attr.aria-label]="'Inativar ' + v.descricao" (click)="inativarVeiculo(v)"><i class="ti ti-trash"></i></button>
+                        } @else {
+                          <button class="btn btn-ghost btn-xs text-success" [attr.aria-label]="'Reativar ' + v.descricao" title="Reativar" (click)="reativarVeiculo(v)"><i class="ti ti-refresh"></i></button>
                         }
                       </div>
                     </td>
@@ -167,7 +168,7 @@
     <div class="flex justify-between items-center mb-4">
       <label class="input input-bordered flex items-center gap-2 w-80">
         <i class="ti ti-search text-base-content/40"></i>
-        <input type="text" class="grow" placeholder="Buscar por nome ou especialidade..."
+        <input type="text" class="grow" placeholder="Buscar por nome ou especialidade..." aria-label="Buscar mecânicos"
           [ngModel]="buscaMecanico()" (ngModelChange)="buscaMecanico.set($event)" />
       </label>
       <button class="btn btn-primary gap-2" (click)="abrirModalMecanico()">
@@ -178,6 +179,8 @@
       <div class="card-body">
         @if (carregandoMecanicos()) {
           <div class="flex justify-center py-16"><span class="loading loading-spinner loading-lg text-primary"></span></div>
+        } @else if (erroMecanicos()) {
+          <app-erro-carregar [mensagem]="erroMecanicos()" (tentarDeNovo)="carregarMecanicos()" />
         } @else if (mecanicosFiltrados().length === 0) {
           <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
             <i class="ti ti-tool text-6xl"></i><p class="font-medium">Nenhum mecânico encontrado</p>
@@ -195,12 +198,11 @@
                     <td class="text-sm text-base-content/70">{{ m.especialidade ?? '-' }}</td>
                     <td class="text-sm text-base-content/70">{{ m.telefone ?? '-' }}</td>
                     <td class="text-center">
-                      @if (m.ativo) { <span class="badge badge-success">Ativo</span> }
-                      @else { <span class="badge badge-ghost">Inativo</span> }
+                      <app-status-badge [texto]="m.ativo ? 'Ativo' : 'Inativo'" [cor]="m.ativo ? 'badge-success' : 'badge-ghost'" />
                     </td>
                     <td class="text-center">
                       <div class="flex items-center justify-center gap-1">
-                        <button class="btn btn-ghost btn-xs" (click)="abrirModalMecanico(m)"><i class="ti ti-edit"></i></button>
+                        <button class="btn btn-ghost btn-xs" [attr.aria-label]="'Editar ' + m.nome" (click)="abrirModalMecanico(m)"><i class="ti ti-edit"></i></button>
                         <button class="btn btn-xs gap-1" [class.btn-error]="m.ativo" [class.btn-success]="!m.ativo" (click)="alterarAtivoMecanico(m)">
                           <i class="ti" [class.ti-ban]="m.ativo" [class.ti-check]="!m.ativo"></i>
                           {{ m.ativo ? 'Desativar' : 'Ativar' }}
@@ -222,7 +224,7 @@
     <div class="flex justify-between items-center mb-4">
       <label class="input input-bordered flex items-center gap-2 w-80">
         <i class="ti ti-search text-base-content/40"></i>
-        <input type="text" class="grow" placeholder="Buscar por nome ou cidade..."
+        <input type="text" class="grow" placeholder="Buscar por nome ou cidade..." aria-label="Buscar postos"
           [ngModel]="buscaPosto()" (ngModelChange)="buscaPosto.set($event)" />
       </label>
       <button class="btn btn-primary gap-2" (click)="abrirModalPosto()">
@@ -233,6 +235,8 @@
       <div class="card-body">
         @if (carregandoPostos()) {
           <div class="flex justify-center py-16"><span class="loading loading-spinner loading-lg text-primary"></span></div>
+        } @else if (erroPostos()) {
+          <app-erro-carregar [mensagem]="erroPostos()" (tentarDeNovo)="carregarPostos()" />
         } @else if (postosFiltrados().length === 0) {
           <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
             <i class="ti ti-building-store text-6xl"></i><p class="font-medium">Nenhum posto encontrado</p>
@@ -250,12 +254,11 @@
                     <td class="text-sm text-base-content/70">{{ p.endereco ?? '-' }}</td>
                     <td class="text-sm text-base-content/70">{{ p.cidade ?? '-' }}</td>
                     <td class="text-center">
-                      @if (p.ativo) { <span class="badge badge-success">Ativo</span> }
-                      @else { <span class="badge badge-ghost">Inativo</span> }
+                      <app-status-badge [texto]="p.ativo ? 'Ativo' : 'Inativo'" [cor]="p.ativo ? 'badge-success' : 'badge-ghost'" />
                     </td>
                     <td class="text-center">
                       <div class="flex items-center justify-center gap-1">
-                        <button class="btn btn-ghost btn-xs" (click)="abrirModalPosto(p)"><i class="ti ti-edit"></i></button>
+                        <button class="btn btn-ghost btn-xs" [attr.aria-label]="'Editar ' + p.nome" (click)="abrirModalPosto(p)"><i class="ti ti-edit"></i></button>
                         <button class="btn btn-xs gap-1" [class.btn-error]="p.ativo" [class.btn-success]="!p.ativo" (click)="alterarAtivoPosto(p)">
                           <i class="ti" [class.ti-ban]="p.ativo" [class.ti-check]="!p.ativo"></i>
                           {{ p.ativo ? 'Desativar' : 'Ativar' }}
@@ -287,6 +290,8 @@
     <div class="card-body">
       @if (carregandoChecklist()) {
         <div class="flex justify-center py-16"><span class="loading loading-spinner loading-lg text-primary"></span></div>
+      } @else if (erroChecklist()) {
+        <app-erro-carregar [mensagem]="erroChecklist()" (tentarDeNovo)="carregarChecklist()" />
       } @else if (!templateAtivo() || templateAtivo()!.itens.length === 0) {
         <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
           <i class="ti ti-checklist text-6xl"></i>
@@ -309,12 +314,10 @@
                   <td class="text-base-content/60">{{ item.ordem }}</td>
                   <td class="font-medium">{{ item.descricao }}</td>
                   <td class="text-center">
-                    @if (item.obrigatorio) { <span class="badge badge-error badge-sm">Obrigatório</span> }
-                    @else { <span class="badge badge-ghost badge-sm">Opcional</span> }
+                    <app-status-badge [texto]="item.obrigatorio ? 'Obrigatório' : 'Opcional'" [cor]="item.obrigatorio ? 'badge-error badge-sm' : 'badge-ghost badge-sm'" />
                   </td>
                   <td class="text-center">
-                    @if (item.ativo) { <span class="badge badge-success">Ativo</span> }
-                    @else { <span class="badge badge-ghost">Inativo</span> }
+                    <app-status-badge [texto]="item.ativo ? 'Ativo' : 'Inativo'" [cor]="item.ativo ? 'badge-success' : 'badge-ghost'" />
                   </td>
                   <td class="text-center">
                     <button class="btn btn-xs gap-1"
@@ -339,66 +342,66 @@
 
 <!-- MODAL NOVO USUÁRIO -->
 @if (modalUsuario()) {
-  <div class="modal modal-open">
+  <div class="modal modal-open" appModal (fechar)="fecharModalUsuario()">
     <div class="modal-box max-w-2xl">
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModalUsuario()"><i class="ti ti-x"></i></button>
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Fechar" (click)="fecharModalUsuario()"><i class="ti ti-x"></i></button>
       <h3 class="font-bold text-lg mb-4">Novo Usuário</h3>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="form-control sm:col-span-2">
-          <label class="label"><span class="label-text font-medium">Nome completo *</span></label>
-          <input type="text" class="input input-bordered" placeholder="Ex: João da Silva" [(ngModel)]="novoUsuario.nomeCompleto" />
+          <label class="label" for="usu-nome"><span class="label-text font-medium">Nome completo *</span></label>
+          <input id="usu-nome" type="text" class="input input-bordered" placeholder="Ex: João da Silva" [(ngModel)]="novoUsuario.nomeCompleto" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">CPF *</span></label>
-          <input type="text" class="input input-bordered" placeholder="000.000.000-00" [(ngModel)]="novoUsuario.cpf" />
+          <label class="label" for="usu-cpf"><span class="label-text font-medium">CPF *</span></label>
+          <input id="usu-cpf" type="text" inputmode="numeric" maxlength="14" class="input input-bordered" placeholder="000.000.000-00" [(ngModel)]="novoUsuario.cpf" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Telefone</span></label>
-          <input type="text" class="input input-bordered" placeholder="(41) 99999-9999" [(ngModel)]="novoUsuario.telefone" />
+          <label class="label" for="usu-telefone"><span class="label-text font-medium">Telefone</span></label>
+          <input id="usu-telefone" type="text" class="input input-bordered" placeholder="(41) 99999-9999" [(ngModel)]="novoUsuario.telefone" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Login *</span></label>
-          <input type="text" class="input input-bordered" placeholder="Ex: joao.silva" [(ngModel)]="novoUsuario.login" />
+          <label class="label" for="usu-login"><span class="label-text font-medium">Login *</span></label>
+          <input id="usu-login" type="text" class="input input-bordered" placeholder="Ex: joao.silva" [(ngModel)]="novoUsuario.login" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Senha *</span></label>
-          <input type="password" class="input input-bordered" placeholder="Senha" [(ngModel)]="novoUsuario.senha" />
+          <label class="label" for="usu-senha"><span class="label-text font-medium">Senha *</span></label>
+          <input id="usu-senha" type="password" class="input input-bordered" placeholder="Senha" [(ngModel)]="novoUsuario.senha" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Perfil *</span></label>
-          <select class="select select-bordered" [(ngModel)]="novoUsuario.perfil">
+          <label class="label" for="usu-perfil"><span class="label-text font-medium">Perfil *</span></label>
+          <select id="usu-perfil" class="select select-bordered" [(ngModel)]="novoUsuario.perfil">
             <option value="motorista">Motorista</option>
             <option value="gestor">Gestor</option>
           </select>
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Matrícula</span></label>
-          <input type="text" class="input input-bordered" placeholder="Ex: 123456" [(ngModel)]="novoUsuario.matricula" />
+          <label class="label" for="usu-matricula"><span class="label-text font-medium">Matrícula</span></label>
+          <input id="usu-matricula" type="text" class="input input-bordered" placeholder="Ex: 123456" [(ngModel)]="novoUsuario.matricula" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Vínculo</span></label>
-          <select class="select select-bordered" [(ngModel)]="novoUsuario.vinculo">
-            <option value="">Selecione</option>
-            @for (v of vinculos; track v) { <option [value]="v">{{ v }}</option> }
+          <label class="label" for="usu-vinculo"><span class="label-text font-medium">Vínculo</span></label>
+          <select id="usu-vinculo" class="select select-bordered" [(ngModel)]="novoUsuario.vinculo">
+            <option [ngValue]="null">Selecione</option>
+            @for (v of vinculos; track v) { <option [ngValue]="v">{{ v }}</option> }
           </select>
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Secretaria</span></label>
-          <select class="select select-bordered" [(ngModel)]="novoUsuario.secretariaId">
-            <option [value]="null">Selecione</option>
-            @for (s of secretarias(); track s.id) { <option [value]="s.id">{{ s.nome }}</option> }
+          <label class="label" for="usu-secretaria"><span class="label-text font-medium">Secretaria</span></label>
+          <select id="usu-secretaria" class="select select-bordered" [(ngModel)]="novoUsuario.secretariaId">
+            <option [ngValue]="null">Selecione</option>
+            @for (s of secretarias(); track s.id) { <option [ngValue]="s.id">{{ s.nome }}</option> }
           </select>
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Categoria CNH</span></label>
-          <select class="select select-bordered" [(ngModel)]="novoUsuario.categoriaCnh">
-            <option value="">Selecione</option>
-            @for (c of categoriasCnh; track c) { <option [value]="c">{{ c }}</option> }
+          <label class="label" for="usu-cnh"><span class="label-text font-medium">Categoria CNH</span></label>
+          <select id="usu-cnh" class="select select-bordered" [(ngModel)]="novoUsuario.categoriaCnh">
+            <option [ngValue]="null">Selecione</option>
+            @for (c of categoriasCnh; track c) { <option [ngValue]="c">{{ c }}</option> }
           </select>
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Validade CNH</span></label>
-          <input type="date" class="input input-bordered" [(ngModel)]="novoUsuario.validadeCnh" />
+          <label class="label" for="usu-validade"><span class="label-text font-medium">Validade CNH</span></label>
+          <input id="usu-validade" type="date" class="input input-bordered" [(ngModel)]="novoUsuario.validadeCnh" />
         </div>
       </div>
       <div class="modal-action">
@@ -415,48 +418,48 @@
 
 <!-- MODAL EDITAR USUÁRIO -->
 @if (modalEditarUsuario()) {
-  <div class="modal modal-open">
+  <div class="modal modal-open" appModal (fechar)="fecharModalEditar()">
     <div class="modal-box max-w-2xl">
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModalEditar()"><i class="ti ti-x"></i></button>
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Fechar" (click)="fecharModalEditar()"><i class="ti ti-x"></i></button>
       <h3 class="font-bold text-lg mb-1">Editar Usuário</h3>
       <p class="text-sm text-base-content/60 mb-4">&#64;{{ usuarioEditando()?.login }}</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="form-control sm:col-span-2">
-          <label class="label"><span class="label-text font-medium">Nome completo</span></label>
-          <input type="text" class="input input-bordered" [(ngModel)]="editarUsuarioForm.nomeCompleto" />
+          <label class="label" for="edit-nome"><span class="label-text font-medium">Nome completo</span></label>
+          <input id="edit-nome" type="text" class="input input-bordered" [(ngModel)]="editarUsuarioForm.nomeCompleto" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Telefone</span></label>
-          <input type="text" class="input input-bordered" placeholder="(41) 99999-9999" [(ngModel)]="editarUsuarioForm.telefone" />
+          <label class="label" for="edit-telefone"><span class="label-text font-medium">Telefone</span></label>
+          <input id="edit-telefone" type="text" class="input input-bordered" placeholder="(41) 99999-9999" [(ngModel)]="editarUsuarioForm.telefone" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Matrícula</span></label>
-          <input type="text" class="input input-bordered" [(ngModel)]="editarUsuarioForm.matricula" />
+          <label class="label" for="edit-matricula"><span class="label-text font-medium">Matrícula</span></label>
+          <input id="edit-matricula" type="text" class="input input-bordered" [(ngModel)]="editarUsuarioForm.matricula" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Vínculo</span></label>
-          <select class="select select-bordered" [(ngModel)]="editarUsuarioForm.vinculo">
-            <option value="">Selecione</option>
-            @for (v of vinculos; track v) { <option [value]="v">{{ v }}</option> }
+          <label class="label" for="edit-vinculo"><span class="label-text font-medium">Vínculo</span></label>
+          <select id="edit-vinculo" class="select select-bordered" [(ngModel)]="editarUsuarioForm.vinculo">
+            <option [ngValue]="null">Selecione</option>
+            @for (v of vinculos; track v) { <option [ngValue]="v">{{ v }}</option> }
           </select>
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Secretaria</span></label>
-          <select class="select select-bordered" [(ngModel)]="editarUsuarioForm.secretariaId">
-            <option [value]="null">Selecione</option>
-            @for (s of secretarias(); track s.id) { <option [value]="s.id">{{ s.nome }}</option> }
+          <label class="label" for="edit-secretaria"><span class="label-text font-medium">Secretaria</span></label>
+          <select id="edit-secretaria" class="select select-bordered" [(ngModel)]="editarUsuarioForm.secretariaId">
+            <option [ngValue]="null">Selecione</option>
+            @for (s of secretarias(); track s.id) { <option [ngValue]="s.id">{{ s.nome }}</option> }
           </select>
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Categoria CNH</span></label>
-          <select class="select select-bordered" [(ngModel)]="editarUsuarioForm.categoriaCnh">
-            <option value="">Selecione</option>
-            @for (c of categoriasCnh; track c) { <option [value]="c">{{ c }}</option> }
+          <label class="label" for="edit-cnh"><span class="label-text font-medium">Categoria CNH</span></label>
+          <select id="edit-cnh" class="select select-bordered" [(ngModel)]="editarUsuarioForm.categoriaCnh">
+            <option [ngValue]="null">Selecione</option>
+            @for (c of categoriasCnh; track c) { <option [ngValue]="c">{{ c }}</option> }
           </select>
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Validade CNH</span></label>
-          <input type="date" class="input input-bordered" [(ngModel)]="editarUsuarioForm.validadeCnh" />
+          <label class="label" for="edit-validade"><span class="label-text font-medium">Validade CNH</span></label>
+          <input id="edit-validade" type="date" class="input input-bordered" [(ngModel)]="editarUsuarioForm.validadeCnh" />
         </div>
       </div>
       <div class="modal-action">
@@ -473,51 +476,64 @@
 
 <!-- MODAL VEÍCULO -->
 @if (modalVeiculo()) {
-  <div class="modal modal-open">
+  <div class="modal modal-open" appModal (fechar)="fecharModalVeiculo()">
     <div class="modal-box max-w-2xl">
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModalVeiculo()"><i class="ti ti-x"></i></button>
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Fechar" (click)="fecharModalVeiculo()"><i class="ti ti-x"></i></button>
       <h3 class="font-bold text-lg mb-4">{{ veiculoEditando() ? 'Editar Veículo' : 'Novo Veículo' }}</h3>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        @if (!veiculoEditando()) {
+        @if (veiculoEditando(); as editando) {
+          <!-- Na edição a API não altera o tipo: só mostra. -->
           <div class="form-control sm:col-span-2">
-            <label class="label"><span class="label-text font-medium">Tipo *</span></label>
-            <select class="select select-bordered" [(ngModel)]="novoVeiculo.tipoId">
+            <p class="label"><span class="label-text font-medium">Tipo</span></p>
+            <p class="input input-bordered flex items-center bg-base-200" aria-readonly="true">{{ editando.tipoNome }}</p>
+            <span class="text-xs text-base-content/60 mt-1">O tipo não pode ser alterado depois do cadastro.</span>
+          </div>
+        } @else {
+          <div class="form-control sm:col-span-2">
+            <label class="label" for="tipoVeiculo"><span class="label-text font-medium">Tipo *</span></label>
+            <select id="tipoVeiculo" class="select select-bordered" [(ngModel)]="novoVeiculo.tipoId">
               <option value="">Selecione o tipo</option>
-              @for (t of tiposVeiculo; track t.id) { <option [value]="t.id">{{ t.nome }}</option> }
+              @for (t of tiposVeiculo(); track t.id) { <option [value]="t.id">{{ t.nome }}</option> }
             </select>
+            @if (erroTiposVeiculo()) {
+              <span class="text-xs text-error mt-1">
+                Não foi possível carregar os tipos: {{ erroTiposVeiculo() }}
+                <button class="link" (click)="carregarTiposVeiculo()">Tentar de novo</button>
+              </span>
+            }
           </div>
         }
         <div class="form-control sm:col-span-2">
-          <label class="label"><span class="label-text font-medium">Descrição *</span></label>
-          <input type="text" class="input input-bordered" placeholder="Ex: Caminhão Basculante" [(ngModel)]="novoVeiculo.descricao" />
+          <label class="label" for="vei-descricao"><span class="label-text font-medium">Descrição *</span></label>
+          <input id="vei-descricao" type="text" class="input input-bordered" placeholder="Ex: Caminhão Basculante" [(ngModel)]="novoVeiculo.descricao" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Marca</span></label>
-          <input type="text" class="input input-bordered" placeholder="Ex: MERCEDES" [(ngModel)]="novoVeiculo.marca" />
+          <label class="label" for="vei-marca"><span class="label-text font-medium">Marca</span></label>
+          <input id="vei-marca" type="text" class="input input-bordered" placeholder="Ex: MERCEDES" [(ngModel)]="novoVeiculo.marca" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Modelo</span></label>
-          <input type="text" class="input input-bordered" placeholder="Ex: ATEGO 1719" [(ngModel)]="novoVeiculo.modelo" />
+          <label class="label" for="vei-modelo"><span class="label-text font-medium">Modelo</span></label>
+          <input id="vei-modelo" type="text" class="input input-bordered" placeholder="Ex: ATEGO 1719" [(ngModel)]="novoVeiculo.modelo" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Ano</span></label>
-          <input type="number" class="input input-bordered" placeholder="Ex: 2020" [(ngModel)]="novoVeiculo.ano" />
+          <label class="label" for="vei-ano"><span class="label-text font-medium">Ano</span></label>
+          <input id="vei-ano" type="number" class="input input-bordered" placeholder="Ex: 2020" [(ngModel)]="novoVeiculo.ano" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Cor</span></label>
-          <input type="text" class="input input-bordered" placeholder="Ex: BRANCA" [(ngModel)]="novoVeiculo.cor" />
+          <label class="label" for="vei-cor"><span class="label-text font-medium">Cor</span></label>
+          <input id="vei-cor" type="text" class="input input-bordered" placeholder="Ex: BRANCA" [(ngModel)]="novoVeiculo.cor" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Placa</span></label>
-          <input type="text" class="input input-bordered" placeholder="Ex: ABC-1234" [(ngModel)]="novoVeiculo.placa" />
+          <label class="label" for="vei-placa"><span class="label-text font-medium">Placa</span></label>
+          <input id="vei-placa" type="text" class="input input-bordered" placeholder="Ex: ABC-1234" [(ngModel)]="novoVeiculo.placa" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">RENAVAM</span></label>
-          <input type="text" class="input input-bordered" placeholder="Ex: 00123456789" [(ngModel)]="novoVeiculo.renavam" />
+          <label class="label" for="vei-renavam"><span class="label-text font-medium">RENAVAM</span></label>
+          <input id="vei-renavam" type="text" class="input input-bordered" placeholder="Ex: 00123456789" [(ngModel)]="novoVeiculo.renavam" />
         </div>
         <div class="form-control sm:col-span-2">
-          <label class="label"><span class="label-text font-medium">Chassi</span></label>
-          <input type="text" class="input input-bordered" placeholder="Ex: 9BM..." [(ngModel)]="novoVeiculo.chassi" />
+          <label class="label" for="vei-chassi"><span class="label-text font-medium">Chassi</span></label>
+          <input id="vei-chassi" type="text" class="input input-bordered" placeholder="Ex: 9BM..." [(ngModel)]="novoVeiculo.chassi" />
         </div>
         <div class="form-control sm:col-span-2">
           <label class="label cursor-pointer justify-start gap-3">
@@ -530,8 +546,8 @@
         </div>
         @if (!veiculoEditando()) {
           <div class="form-control">
-            <label class="label"><span class="label-text font-medium">Medidor inicial</span></label>
-            <input type="number" class="input input-bordered" min="0" [(ngModel)]="novoVeiculo.medidorAtual" />
+            <label class="label" for="vei-medidor"><span class="label-text font-medium">Medidor inicial</span></label>
+            <input id="vei-medidor" type="number" class="input input-bordered" min="0" [(ngModel)]="novoVeiculo.medidorAtual" />
           </div>
         }
       </div>
@@ -549,22 +565,22 @@
 
 <!-- MODAL MECÂNICO -->
 @if (modalMecanico()) {
-  <div class="modal modal-open">
+  <div class="modal modal-open" appModal (fechar)="fecharModalMecanico()">
     <div class="modal-box max-w-lg">
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModalMecanico()"><i class="ti ti-x"></i></button>
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Fechar" (click)="fecharModalMecanico()"><i class="ti ti-x"></i></button>
       <h3 class="font-bold text-lg mb-4">{{ mecanicoEditando() ? 'Editar Mecânico' : 'Novo Mecânico' }}</h3>
       <div class="grid grid-cols-1 gap-4">
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Nome *</span></label>
-          <input type="text" class="input input-bordered" placeholder="Ex: JOSÉ DA SILVA" [(ngModel)]="novoMecanico.nome" />
+          <label class="label" for="mec-nome"><span class="label-text font-medium">Nome *</span></label>
+          <input id="mec-nome" type="text" class="input input-bordered" placeholder="Ex: JOSÉ DA SILVA" [(ngModel)]="novoMecanico.nome" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Especialidade</span></label>
-          <input type="text" class="input input-bordered" placeholder="Ex: MOTOR E CÂMBIO" [(ngModel)]="novoMecanico.especialidade" />
+          <label class="label" for="mec-especialidade"><span class="label-text font-medium">Especialidade</span></label>
+          <input id="mec-especialidade" type="text" class="input input-bordered" placeholder="Ex: MOTOR E CÂMBIO" [(ngModel)]="novoMecanico.especialidade" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Telefone</span></label>
-          <input type="text" class="input input-bordered" placeholder="(41) 99999-9999" [(ngModel)]="novoMecanico.telefone" />
+          <label class="label" for="mec-telefone"><span class="label-text font-medium">Telefone</span></label>
+          <input id="mec-telefone" type="text" class="input input-bordered" placeholder="(41) 99999-9999" [(ngModel)]="novoMecanico.telefone" />
         </div>
       </div>
       <div class="modal-action">
@@ -581,22 +597,22 @@
 
 <!-- MODAL POSTO -->
 @if (modalPosto()) {
-  <div class="modal modal-open">
+  <div class="modal modal-open" appModal (fechar)="fecharModalPosto()">
     <div class="modal-box max-w-lg">
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModalPosto()"><i class="ti ti-x"></i></button>
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Fechar" (click)="fecharModalPosto()"><i class="ti ti-x"></i></button>
       <h3 class="font-bold text-lg mb-4">{{ postoEditando() ? 'Editar Posto' : 'Novo Posto' }}</h3>
       <div class="grid grid-cols-1 gap-4">
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Nome *</span></label>
-          <input type="text" class="input input-bordered" placeholder="Ex: POSTO CENTRAL" [(ngModel)]="novoPosto.nome" />
+          <label class="label" for="pos-nome"><span class="label-text font-medium">Nome *</span></label>
+          <input id="pos-nome" type="text" class="input input-bordered" placeholder="Ex: POSTO CENTRAL" [(ngModel)]="novoPosto.nome" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Endereço</span></label>
-          <input type="text" class="input input-bordered" placeholder="Ex: Rua das Flores, 123" [(ngModel)]="novoPosto.endereco" />
+          <label class="label" for="pos-endereco"><span class="label-text font-medium">Endereço</span></label>
+          <input id="pos-endereco" type="text" class="input input-bordered" placeholder="Ex: Rua das Flores, 123" [(ngModel)]="novoPosto.endereco" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Cidade</span></label>
-          <input type="text" class="input input-bordered" placeholder="Ex: CRUZ MACHADO" [(ngModel)]="novoPosto.cidade" />
+          <label class="label" for="pos-cidade"><span class="label-text font-medium">Cidade</span></label>
+          <input id="pos-cidade" type="text" class="input input-bordered" placeholder="Ex: CRUZ MACHADO" [(ngModel)]="novoPosto.cidade" />
         </div>
       </div>
       <div class="modal-action">
@@ -611,18 +627,18 @@
   </div>
 }
 @if (modalItem()) {
-  <div class="modal modal-open">
+  <div class="modal modal-open" appModal (fechar)="fecharModalItem()">
     <div class="modal-box max-w-lg">
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModalItem()"><i class="ti ti-x"></i></button>
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Fechar" (click)="fecharModalItem()"><i class="ti ti-x"></i></button>
       <h3 class="font-bold text-lg mb-4">Novo Item de Checklist</h3>
       <div class="grid grid-cols-1 gap-4">
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Descrição *</span></label>
-          <input type="text" class="input input-bordered" placeholder="Ex: Verificar nível de óleo" [(ngModel)]="novoItem.descricao" />
+          <label class="label" for="item-descricao"><span class="label-text font-medium">Descrição *</span></label>
+          <input id="item-descricao" type="text" class="input input-bordered" placeholder="Ex: Verificar nível de óleo" [(ngModel)]="novoItem.descricao" />
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Ordem</span></label>
-          <input type="number" class="input input-bordered" min="1" [(ngModel)]="novoItem.ordem" />
+          <label class="label" for="item-ordem"><span class="label-text font-medium">Ordem</span></label>
+          <input id="item-ordem" type="number" class="input input-bordered" min="1" [(ngModel)]="novoItem.ordem" />
         </div>
         <div class="form-control">
           <label class="label cursor-pointer justify-start gap-3">

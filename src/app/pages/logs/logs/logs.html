@@ -59,13 +59,14 @@
           <input
             type="text"
             class="grow"
-            placeholder="Buscar por usuário ou descrição..."
+            placeholder="Buscar por usuário ou descrição..." aria-label="Buscar nos logs"
             [ngModel]="busca()"
             (ngModelChange)="busca.set($event)" />
         </label>
 
         <select
           class="select select-bordered w-full"
+          aria-label="Filtrar por ação"
           [ngModel]="filtroAcao()"
           (ngModelChange)="filtroAcao.set($event)">
           <option value="">Todas as ações</option>
@@ -83,16 +84,16 @@
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
         <div>
-          <label class="label"><span class="label-text text-xs">Data início</span></label>
-          <input
+          <label class="label" for="filtro-inicio"><span class="label-text text-xs">Data início</span></label>
+          <input id="filtro-inicio"
             type="date"
             class="input input-bordered w-full"
             [ngModel]="filtroInicio()"
             (ngModelChange)="filtroInicio.set($event)" />
         </div>
         <div>
-          <label class="label"><span class="label-text text-xs">Data fim</span></label>
-          <input
+          <label class="label" for="filtro-fim"><span class="label-text text-xs">Data fim</span></label>
+          <input id="filtro-fim"
             type="date"
             class="input input-bordered w-full"
             [ngModel]="filtroFim()"
@@ -118,6 +119,9 @@
         <div class="flex justify-center py-16">
           <span class="loading loading-spinner loading-lg text-primary"></span>
         </div>
+
+      } @else if (erroCarregar()) {
+        <app-erro-carregar [mensagem]="erroCarregar()" (tentarDeNovo)="carregarLogs()" />
 
       } @else if (logsFiltrados().length === 0) {
         <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
@@ -145,21 +149,7 @@
                   </td>
                   <td>
   <div class="flex items-center gap-2">
-    @if (l.usuarioFoto) {
-      <div class="avatar">
-        <div class="w-8 h-8 rounded-full">
-          <img [src]="'data:image/jpeg;base64,' + l.usuarioFoto" alt="Foto" />
-        </div>
-      </div>
-    } @else {
-      <div class="avatar placeholder">
-        <div class="bg-primary text-primary-content rounded-full w-8 h-8">
-          <span class="text-xs font-bold">
-            {{ (l.usuarioNome ?? l.usuarioLogin).charAt(0).toUpperCase() }}
-          </span>
-        </div>
-      </div>
-    }
+    <app-avatar [foto]="l.usuarioFoto" [nome]="l.usuarioNome ?? l.usuarioLogin" [tamanho]="8" />
     <div>
       <p class="font-medium text-sm">{{ l.usuarioNome ?? l.usuarioLogin }}</p>
       <p class="text-xs text-base-content/40">&#64;{{ l.usuarioLogin }}</p>
@@ -167,9 +157,7 @@
   </div>
 </td>
                   <td>
-                    <span class="badge {{ getCorAcao(l.acao) }}">
-                      {{ getLabelAcao(l.acao) }}
-                    </span>
+                    <app-status-badge [texto]="getLabelAcao(l.acao)" [cor]="getCorAcao(l.acao)" />
                   </td>
                   <td class="text-sm text-base-content/70">{{ l.descricao }}</td>
                 </tr>

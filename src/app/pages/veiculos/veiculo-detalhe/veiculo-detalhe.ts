@@ -1,19 +1,39 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule, ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import * as L from 'leaflet';
-import {
-  UsuarioService, VeiculoResponse, AbastecimentoDetalhado,
-  OcorrenciaDetalhada, ManutencaoResponse, MotoristaVeiculoInfo
-} from '../../../services/usuario';
+import { AbastecimentoService } from '../../../services/abastecimento';
+import { ManutencaoService } from '../../../services/manutencao';
+import { OcorrenciaService } from '../../../services/ocorrencia';
+import { VeiculoService } from '../../../services/veiculo';
+import { AbastecimentoDetalhado } from '../../../interfaces/abastecimento';
+import { ManutencaoResponse } from '../../../interfaces/manutencao';
+import { OcorrenciaDetalhada } from '../../../interfaces/ocorrencia';
+import { MotoristaVeiculoInfo, VeiculoResponse } from '../../../interfaces/veiculo';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { inicioDoDiaLocal, fimDoDiaLocal } from '../../../shared/utils/datas';
+import { AvisosService } from '../../../shared/services/avisos';
+import { badgeStatusVeiculo, rotuloStatusVeiculo } from '../../../shared/utils/veiculos';
+import { AvatarComponent } from '../../../shared/components/avatar/avatar';
+import { ModalOcorrenciaComponent } from '../../../shared/components/modal-ocorrencia/modal-ocorrencia';
+import { badgeCombustivel } from '../../../shared/utils/abastecimentos';
+import { badgeStatusOcorrencia, badgeTipoOcorrencia, rotuloStatusOcorrencia, statusDaOcorrencia } from '../../../shared/utils/ocorrencias';
+import { badgeStatusManutencao, badgeTipoManutencao, rotuloStatusManutencao, rotuloTipoManutencao } from '../../../shared/utils/manutencoes';
+import { ModalDirective } from '../../../shared/directives/modal';
+import { ClicavelDirective } from '../../../shared/directives/clicavel';
+import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge';
+import { SeloHorarioSuspeitoComponent } from '../../../shared/components/selo-horario-suspeito/selo-horario-suspeito';
+
+// O jspdf-autotable grava no doc onde a última tabela terminou, mas não declara esse campo no tipo.
+function fimDaUltimaTabela(doc: jsPDF): number {
+  return (doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 0;
+}
 
 @Component({
   selector: 'app-veiculo-detalhe',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, FormsModule, ModalDirective, ClicavelDirective, ModalOcorrenciaComponent, StatusBadgeComponent, SeloHorarioSuspeitoComponent, AvatarComponent],
   templateUrl: './veiculo-detalhe.html',
   styleUrl: './veiculo-detalhe.css'
 })
@@ -31,8 +51,6 @@ export class VeiculoDetalhe implements OnInit {
   abaAtiva           = signal('abastecimentos');
 
   ocorrenciaSelecionada = signal<OcorrenciaDetalhada | null>(null);
-  mapaIniciado = false;
-  private mapaLeaflet: any = null;
 
   periodoInicio = signal('');
   periodoFim    = signal('');
@@ -51,7 +69,11 @@ export class VeiculoDetalhe implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    public usuarioService: UsuarioService
+    private abastecimentoService: AbastecimentoService,
+    private manutencaoService: ManutencaoService,
+    private ocorrenciaService: OcorrenciaService,
+    private veiculoService: VeiculoService,
+    private avisos: AvisosService
   ) {}
 
   ngOnInit(): void {
@@ -60,14 +82,21 @@ export class VeiculoDetalhe implements OnInit {
   }
 
   private carregarDados(): void {
-    this.usuarioService.buscarVeiculo(this.veiculoId).subscribe({
+    this.veiculoService.buscarVeiculo(this.veiculoId).subscribe({
       next: (v) => { this.veiculo.set(v); this.carregando.set(false); },
-      error: () => { this.carregando.set(false); this.router.navigate(['/veiculos']); }
+      error: (e) => { this.carregando.set(false); this.avisos.erroHttp(e); this.router.navigate(['/veiculos']); }
     });
-    this.usuarioService.listarAbastecimentosPorVeiculo(this.veiculoId).subscribe({ next: d => this.abastecimentos.set(d) });
-    this.usuarioService.listarOcorrenciasPorVeiculo(this.veiculoId).subscribe({ next: d => this.ocorrencias.set(d) });
-    this.usuarioService.listarManutencoesPorVeiculo(this.veiculoId).subscribe({ next: d => this.manutencoes.set(d) });
-    this.usuarioService.buscarMotoristasVeiculo(this.veiculoId).subscribe({
+    // Se alguma aba falhar, avisa uma vez só (senão a aba mostraria "nenhum registro" sem ser verdade).
+    let avisouFalha = false;
+    const falhaAba = () => {
+      if (avisouFalha) return;
+      avisouFalha = true;
+      this.avisos.erro('Parte dos dados do veículo não carregou (abastecimentos, ocorrências ou manutenções). Recarregue a página.');
+    };
+    this.abastecimentoService.listarAbastecimentosPorVeiculo(this.veiculoId).subscribe({ next: d => this.abastecimentos.set(d), error: falhaAba });
+    this.ocorrenciaService.listarOcorrenciasPorVeiculo(this.veiculoId).subscribe({ next: d => this.ocorrencias.set(d), error: falhaAba });
+    this.manutencaoService.listarManutencoesPorVeiculo(this.veiculoId).subscribe({ next: d => this.manutencoes.set(d), error: falhaAba });
+    this.veiculoService.buscarMotoristasVeiculo(this.veiculoId).subscribe({
       next: data => { this.motoristaMaisUsou.set(data.maisUsou); this.ultimoMotorista.set(data.ultimo); }
     });
   }
@@ -93,13 +122,12 @@ export class VeiculoDetalhe implements OnInit {
 
   private filtrarPorPeriodo<T>(lista: T[], campo: keyof T): T[] {
     let res = lista;
-    if (this.periodoInicio()) {
-      const ini = new Date(this.periodoInicio());
+    const ini = inicioDoDiaLocal(this.periodoInicio());
+    if (ini) {
       res = res.filter(i => i[campo] && new Date(i[campo] as string) >= ini);
     }
-    if (this.periodoFim()) {
-      const fim = new Date(this.periodoFim());
-      fim.setHours(23, 59, 59);
+    const fim = fimDoDiaLocal(this.periodoFim());
+    if (fim) {
       res = res.filter(i => i[campo] && new Date(i[campo] as string) <= fim);
     }
     return res;
@@ -110,9 +138,9 @@ export class VeiculoDetalhe implements OnInit {
     if (!v) return;
     this.gerandoPDF.set(true);
 
-    const abastecimentos = this.filtrarPorPeriodo(this.abastecimentos(), 'registradoEm' as any);
-    const ocorrencias    = this.filtrarPorPeriodo(this.ocorrencias(), 'registradoEm' as any);
-    const manutencoes    = this.filtrarPorPeriodo(this.manutencoes(), 'abertaEm' as any);
+    const abastecimentos = this.filtrarPorPeriodo(this.abastecimentos(), 'registradoEm');
+    const ocorrencias    = this.filtrarPorPeriodo(this.ocorrencias(), 'registradoEm');
+    const manutencoes    = this.filtrarPorPeriodo(this.manutencoes(), 'abertaEm');
 
     const totalLitros     = abastecimentos.reduce((acc, a) => acc + a.litros, 0);
     const totalGasto      = abastecimentos.reduce((acc, a) => acc + a.valorTotal, 0);
@@ -145,7 +173,7 @@ export class VeiculoDetalhe implements OnInit {
       styles: { fontSize: 9 }, headStyles: { fillColor: [63, 81, 181] }
     });
 
-    const yRes = (doc as any).lastAutoTable.finalY + 8;
+    const yRes = fimDaUltimaTabela(doc) + 8;
     doc.setFontSize(11); doc.text('Resumo do período', 14, yRes);
     autoTable(doc, {
       startY: yRes + 4,
@@ -162,7 +190,7 @@ export class VeiculoDetalhe implements OnInit {
     });
 
     if (abastecimentos.length > 0) {
-      const y = (doc as any).lastAutoTable.finalY + 8;
+      const y = fimDaUltimaTabela(doc) + 8;
       doc.setFontSize(11); doc.text('Abastecimentos', 14, y);
       autoTable(doc, {
         startY: y + 4,
@@ -184,7 +212,7 @@ export class VeiculoDetalhe implements OnInit {
     }
 
     if (ocorrencias.length > 0) {
-      const y = (doc as any).lastAutoTable.finalY + 8;
+      const y = fimDaUltimaTabela(doc) + 8;
       doc.setFontSize(11); doc.text('Ocorrências', 14, y);
       autoTable(doc, {
         startY: y + 4,
@@ -199,14 +227,14 @@ export class VeiculoDetalhe implements OnInit {
     }
 
     if (manutencoes.length > 0) {
-      const y = (doc as any).lastAutoTable.finalY + 8;
+      const y = fimDaUltimaTabela(doc) + 8;
       doc.setFontSize(11); doc.text('Manutenções', 14, y);
       autoTable(doc, {
         startY: y + 4,
         head: [['Data', 'Tipo', 'Descrição', 'Mecânico', 'MO', 'Peças', 'Total', 'Status']],
         body: manutencoes.map(m => [
           m.abertaEm ? new Date(m.abertaEm).toLocaleDateString('pt-BR') : '-',
-          m.tipo === 'preventiva' ? 'Preventiva' : 'Corretiva',
+          rotuloTipoManutencao(m.tipo),
           m.descricao, m.mecanicoResponsavel ?? '-',
           `R$ ${m.custoMaoObra.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
           `R$ ${m.custoPecas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
@@ -231,7 +259,7 @@ export class VeiculoDetalhe implements OnInit {
     const v = this.veiculo();
     if (!v) return;
 
-    const manutencoes = this.filtrarPorPeriodo(this.manutencoes(), 'abertaEm' as any);
+    const manutencoes = this.filtrarPorPeriodo(this.manutencoes(), 'abertaEm');
     const pecasMap = new Map<string, { nomePeca: string; codigoPeca: string | null; marcaPeca: string | null; quantidadeTotal: number; valorUnitario: number; vezes: number }>();
 
     manutencoes.forEach(m => {
@@ -273,38 +301,14 @@ export class VeiculoDetalhe implements OnInit {
     doc.save(`pecas_${v.descricao.replace(/\s+/g, '_').toLowerCase()}_${new Date().toISOString().slice(0, 10)}.pdf`);
   }
 
-  // ─── mapa ocorrência ──────────────────────────────────────────────────────
+  // ─── modal ocorrência (o mapa fica no app-modal-ocorrencia) ─────────────
 
-  abrirModalOcorrencia(o: OcorrenciaDetalhada): void {
-    this.ocorrenciaSelecionada.set(o);
-    this.mapaIniciado = false;
-    if (o.latitude && o.longitude) {
-      setTimeout(() => this.iniciarMapa(o.latitude!, o.longitude!), 300);
-    }
-  }
+  abrirModalOcorrencia(o: OcorrenciaDetalhada): void { this.ocorrenciaSelecionada.set(o); }
+  fecharModalOcorrencia(): void { this.ocorrenciaSelecionada.set(null); }
 
-  fecharModalOcorrencia(): void {
-    this.ocorrenciaSelecionada.set(null);
-    if (this.mapaLeaflet) { this.mapaLeaflet.remove(); this.mapaLeaflet = null; }
-  }
-
-  private iniciarMapa(lat: number, lng: number): void {
-    if (this.mapaIniciado) return;
-    this.mapaIniciado = true;
-    const container = document.getElementById('mapa-ocorrencia-detalhe');
-    if (!container) return;
-    if (this.mapaLeaflet) { this.mapaLeaflet.remove(); this.mapaLeaflet = null; }
-    this.mapaLeaflet = L.map(container).setView([lat, lng], 16);
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      { attribution: 'Tiles © Esri' }).addTo(this.mapaLeaflet);
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-      { attribution: '' }).addTo(this.mapaLeaflet);
-    const icone = L.divIcon({
-      className: '',
-      html: `<span style="display:block;width:16px;height:16px;border-radius:50%;background:#ef4444;border:2px solid #fff;box-shadow:0 0 0 3px #ef444440;"></span>`,
-      iconSize: [16, 16], iconAnchor: [8, 8]
-    });
-    L.marker([lat, lng], { icon: icone }).bindPopup('Local da ocorrência').openPopup().addTo(this.mapaLeaflet);
+  aoAlterarStatusOcorrencia(atualizada: OcorrenciaDetalhada): void {
+    this.ocorrencias.update(lista => lista.map(o => o.id === atualizada.id ? atualizada : o));
+    this.ocorrenciaSelecionada.set(atualizada);
   }
 
   // ─── helpers ─────────────────────────────────────────────────────────────
@@ -320,38 +324,17 @@ export class VeiculoDetalhe implements OnInit {
     return nome.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
   }
 
-  badgeStatus(status: string): string {
-    const m: any = { disponivel: 'badge-success', em_uso: 'badge-warning', manutencao: 'badge-error', inativo: 'badge-ghost' };
-    return m[status] ?? 'badge-ghost';
-  }
-  labelStatus(status: string): string {
-    const m: any = { disponivel: 'Disponível', em_uso: 'Em uso', manutencao: 'Em manutenção', inativo: 'Inativo' };
-    return m[status] ?? status;
-  }
-  badgeStatusManutencao(status: string): string {
-    const m: any = { aberta: 'badge-error', em_andamento: 'badge-warning', concluida: 'badge-success' };
-    return m[status] ?? 'badge-ghost';
-  }
-  labelStatusManutencao(status: string): string {
-    const m: any = { aberta: 'Aberta', em_andamento: 'Em andamento', concluida: 'Concluída' };
-    return m[status] ?? status;
-  }
-  badgeTipoManutencao(tipo: string): string { return tipo === 'preventiva' ? 'badge-info' : 'badge-warning'; }
-  labelTipoManutencao(tipo: string): string { return tipo === 'preventiva' ? 'Preventiva' : 'Corretiva'; }
+  valorDoCampo(evento: Event): string { return (evento.target as HTMLInputElement).value; }
+  badgeStatus(status: string): string { return badgeStatusVeiculo(status); }
+  labelStatus(status: string): string { return rotuloStatusVeiculo(status); }
+  badgeStatusManutencao(status: string): string { return badgeStatusManutencao(status); }
+  labelStatusManutencao(status: string): string { return rotuloStatusManutencao(status); }
+  badgeTipoManutencao(tipo: string): string { return badgeTipoManutencao(tipo); }
+  labelTipoManutencao(tipo: string): string { return rotuloTipoManutencao(tipo); }
 
-  getCorCombustivel(tipo: string): string {
-    const t = tipo.toLowerCase();
-    if (t.includes('diesel')) return 'badge-warning';
-    if (t.includes('gasolina')) return 'badge-error';
-    if (t.includes('etanol')) return 'badge-success';
-    if (t.includes('gnv')) return 'badge-info';
-    return 'badge-neutral';
-  }
-  getCorTipo(tipo: string): string {
-    const t = tipo.toLowerCase();
-    if (t.includes('acidente')) return 'badge-error';
-    if (t.includes('pane')) return 'badge-warning';
-    if (t.includes('pneu')) return 'badge-info';
-    return 'badge-neutral';
-  }
+  badgeCombustivel = badgeCombustivel;
+  badgeTipoOcorrencia = badgeTipoOcorrencia;
+  badgeStatusOcorrencia = badgeStatusOcorrencia;
+  rotuloStatusOcorrencia = rotuloStatusOcorrencia;
+  statusOcorrencia = statusDaOcorrencia;
 }

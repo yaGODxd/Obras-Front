@@ -1,0 +1,10 @@
+@if (url(); as u) {
+  <img [src]="u" [alt]="alt()" [class]="classe()" />
+} @else if (erro()) {
+  <div class="{{ classe() }} bg-base-200 flex flex-col items-center justify-center gap-1 text-xs text-base-content/60 text-center p-1" role="img" [attr.aria-label]="'Não carregou: ' + alt()">
+    <i class="ti ti-photo-off text-lg" aria-hidden="true"></i>
+    Não carregou
+  </div>
+} @else {
+  <div class="{{ classe() }} bg-base-200 animate-pulse" role="img" [attr.aria-label]="'Carregando: ' + alt()"></div>
+}

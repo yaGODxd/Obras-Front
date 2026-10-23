@@ -6,13 +6,20 @@
         <i class="ti ti-truck text-6xl text-primary"></i>
       </div>
 
-      <h2 class="card-title justify-center text-2xl mb-2">Sistema de Frotas</h2>
-      <p class="text-center text-sm text-base-content/60 mb-4">Secretaria de Obras — Cruz Machado/PR</p>
+      <h2 class="card-title justify-center text-2xl mb-2">SIGMAP</h2>
+      <p class="text-center text-sm text-base-content/60 mb-4">Sistema de Frotas — Secretaria de Obras — Cruz Machado/PR</p>
 
-      @if (erro) {
+      @if (aviso()) {
+        <div class="alert alert-warning">
+          <i class="ti ti-clock-exclamation"></i>
+          <span>{{ aviso() }}</span>
+        </div>
+      }
+
+      @if (erro()) {
         <div class="alert alert-error">
           <i class="ti ti-alert-circle"></i>
-          <span>{{ erro }}</span>
+          <span>{{ erro() }}</span>
         </div>
       }
 
@@ -37,7 +44,7 @@
             placeholder="Digite sua senha"
             [(ngModel)]="senha"
             (keyup.enter)="entrar()" />
-          <button type="button" (click)="toggleSenha()">
+          <button type="button" [attr.aria-label]="senhaVisivel ? 'Esconder senha' : 'Mostrar senha'" [attr.aria-pressed]="senhaVisivel" (click)="toggleSenha()">
             <i class="ti ti-eye{{ senhaVisivel ? '-off' : '' }}"></i>
           </button>
         </label>
@@ -46,8 +53,8 @@
       <button
         class="btn btn-primary w-full mt-4"
         (click)="entrar()"
-        [disabled]="carregando">
-        @if (carregando) {
+        [disabled]="carregando()">
+        @if (carregando()) {
           <span class="loading loading-spinner loading-sm"></span>
           Entrando...
         } @else {
@@ -55,6 +62,12 @@
           Entrar
         }
       </button>
+
+      @if (demorando()) {
+        <p class="text-center text-sm text-base-content/70 mt-2">
+          O servidor pode levar cerca de 1 minuto para responder na primeira conexão. Aguarde…
+        </p>
+      }
 
     </div>
   </div>

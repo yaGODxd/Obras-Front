@@ -1,15 +1,35 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { UsuarioService, AbastecimentoDetalhado, OcorrenciaDetalhada, ManutencaoResponse, DiarioResponse, VeiculoResponse, UsuarioResponse } from '../../../services/usuario';
+import { AbastecimentoService } from '../../../services/abastecimento';
+import { DiarioService } from '../../../services/diario';
+import { ManutencaoService } from '../../../services/manutencao';
+import { OcorrenciaService } from '../../../services/ocorrencia';
+import { UsuarioService } from '../../../services/usuario';
+import { VeiculoService } from '../../../services/veiculo';
+import { AbastecimentoDetalhado } from '../../../interfaces/abastecimento';
+import { DiarioResponse } from '../../../interfaces/diario';
+import { ManutencaoResponse } from '../../../interfaces/manutencao';
+import { OcorrenciaDetalhada } from '../../../interfaces/ocorrencia';
+import { UsuarioResponse } from '../../../interfaces/usuario';
+import { VeiculoResponse } from '../../../interfaces/veiculo';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { forkJoin } from 'rxjs';
+import { inicioDoDiaLocal, fimDoDiaLocal, formatarDataSemHora } from '../../../shared/utils/datas';
+import { avisoPendentes, diariosParaRelatorio, rotuloStatusDiario } from '../../../shared/utils/diarios';
+import { AvisosService } from '../../../shared/services/avisos';
+import { rotuloStatusVeiculo } from '../../../shared/utils/veiculos';
+import { ClicavelDirective } from '../../../shared/directives/clicavel';
+import { CelulaCsv, dataHoraCsv, fixo, montarCsv, numero, texto } from '../../../shared/utils/csv';
+import { formatarMoeda, formatarNumero } from '../../../shared/utils/formatos';
+import { rotuloPerfil } from '../../../shared/utils/perfis';
+import { rotuloVeiculo } from '../../../shared/utils/placa';
 
 @Component({
   selector: 'app-relatorios',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ClicavelDirective],
   templateUrl: './relatorios.html',
   styleUrl: './relatorios.css'
 })
@@ -27,24 +47,8 @@ export class RelatoriosComponent implements OnInit {
   filtroInicio = signal('');
   filtroFim = signal('');
   filtroVeiculoId = signal('');
-
-  // Veículos selecionados para relatório por veículo
-  veiculosSelecionados: string[] = [];
-  buscaVeiculo = signal('');
-  mostrarSugestoes = signal(false);
-
-  veiculosFiltradosBusca = computed(() => {
-    const termo = this.buscaVeiculo().toLowerCase();
-    if (!termo) return this.veiculos();
-    return this.veiculos().filter(v =>
-      v.descricao.toLowerCase().includes(termo) ||
-      (v.placa?.toLowerCase().includes(termo) ?? false)
-    );
-  });
-
-  veiculosSelecionadosDetalhes = computed(() =>
-    this.veiculos().filter(v => this.veiculosSelecionados.includes(v.id))
-  );
+  // Relatório de diários: abertos nunca entram; com esta opção, entram só os assinados.
+  somenteAssinados = signal(false);
 
   tipos = [
     { valor: 'abastecimentos', label: 'Abastecimentos', icone: 'ti-droplet' },
@@ -53,26 +57,28 @@ export class RelatoriosComponent implements OnInit {
     { valor: 'diarios', label: 'Lançamento Mensal', icone: 'ti-clipboard-list' }
   ];
 
-  constructor(private usuarioService: UsuarioService) {}
+  constructor(
+    private abastecimentoService: AbastecimentoService,
+    private diarioService: DiarioService,
+    private manutencaoService: ManutencaoService,
+    private ocorrenciaService: OcorrenciaService,
+    private usuarioService: UsuarioService,
+    private veiculoService: VeiculoService,
+    private avisos: AvisosService
+  ) {}
 
   ngOnInit(): void {
-    this.usuarioService.listarVeiculos().subscribe({ next: (data) => this.veiculos.set(data) });
-    this.usuarioService.listarUsuarios().subscribe({ next: (data) => this.usuarios.set(data) });
+    // Sem estas listas, os PDFs cadastrais sairiam vazios: avisa uma vez só.
+    let avisou = false;
+    const falhaCarga = (e: unknown) => { if (!avisou) { avisou = true; this.avisos.erroHttp(e); } };
+    this.veiculoService.listarVeiculos().subscribe({ next: (data) => this.veiculos.set(data), error: falhaCarga });
+    this.usuarioService.listarUsuarios().subscribe({ next: (data) => this.usuarios.set(data), error: falhaCarga });
   }
 
-  // ==================== VEÍCULOS SELECIONADOS ====================
-
-  adicionarVeiculo(v: VeiculoResponse, event: MouseEvent): void {
-  event.preventDefault();
-  if (!this.veiculosSelecionados.includes(v.id)) {
-    this.veiculosSelecionados = [...this.veiculosSelecionados, v.id];
-  }
-  this.buscaVeiculo.set('');
-  this.mostrarSugestoes.set(false);
-}
-
-  removerVeiculo(id: string): void {
-    this.veiculosSelecionados = this.veiculosSelecionados.filter(v => v !== id);
+  // Falha ao gerar um relatório: para o carregamento e mostra o motivo.
+  private falhou(erro: unknown): void {
+    this.carregando.set(false);
+    this.avisos.erroHttp(erro);
   }
 
   // ==================== OPERACIONAIS ====================
@@ -81,24 +87,24 @@ export class RelatoriosComponent implements OnInit {
     this.carregando.set(true);
     const tipo = this.tipoRelatorio();
     if (tipo === 'abastecimentos') {
-      this.usuarioService.listarAbastecimentos().subscribe({
+      this.abastecimentoService.listarAbastecimentos().subscribe({
         next: (data) => { this.downloadCSV(this.abastecimentosParaCSV(this.filtrar(data, 'registradoEm')), 'abastecimentos'); this.carregando.set(false); },
-        error: () => this.carregando.set(false)
+        error: (e) => this.falhou(e)
       });
     } else if (tipo === 'ocorrencias') {
-      this.usuarioService.listarOcorrencias().subscribe({
+      this.ocorrenciaService.listarOcorrencias().subscribe({
         next: (data) => { this.downloadCSV(this.ocorrenciasParaCSV(this.filtrar(data, 'registradoEm')), 'ocorrencias'); this.carregando.set(false); },
-        error: () => this.carregando.set(false)
+        error: (e) => this.falhou(e)
       });
     } else if (tipo === 'manutencoes') {
-      this.usuarioService.listarManutencoes().subscribe({
+      this.manutencaoService.listarManutencoes().subscribe({
         next: (data) => { this.downloadCSV(this.manutencoesParaCSV(this.filtrar(data, 'abertaEm')), 'manutencoes'); this.carregando.set(false); },
-        error: () => this.carregando.set(false)
+        error: (e) => this.falhou(e)
       });
     } else if (tipo === 'diarios') {
-      this.usuarioService.listarDiarios(this.filtroVeiculoId() || undefined).subscribe({
-        next: (data) => { this.downloadCSV(this.diariosParaCSV(this.filtrar(data, 'abertoEm')), 'diarios'); this.carregando.set(false); },
-        error: () => this.carregando.set(false)
+      this.diarioService.listarDiarios(this.filtroVeiculoId() || undefined).subscribe({
+        next: (data) => { this.downloadCSV(this.diariosParaCSV(this.diariosDoRelatorio(data).diarios), 'diarios'); this.carregando.set(false); },
+        error: (e) => this.falhou(e)
       });
     }
   }
@@ -107,24 +113,24 @@ export class RelatoriosComponent implements OnInit {
     this.carregando.set(true);
     const tipo = this.tipoRelatorio();
     if (tipo === 'abastecimentos') {
-      this.usuarioService.listarAbastecimentos().subscribe({
+      this.abastecimentoService.listarAbastecimentos().subscribe({
         next: (data) => { this.abastecimentosPDF(this.filtrar(data, 'registradoEm')); this.carregando.set(false); },
-        error: () => this.carregando.set(false)
+        error: (e) => this.falhou(e)
       });
     } else if (tipo === 'ocorrencias') {
-      this.usuarioService.listarOcorrencias().subscribe({
+      this.ocorrenciaService.listarOcorrencias().subscribe({
         next: (data) => { this.ocorrenciasPDF(this.filtrar(data, 'registradoEm')); this.carregando.set(false); },
-        error: () => this.carregando.set(false)
+        error: (e) => this.falhou(e)
       });
     } else if (tipo === 'manutencoes') {
-      this.usuarioService.listarManutencoes().subscribe({
+      this.manutencaoService.listarManutencoes().subscribe({
         next: (data) => { this.manutencoesPDF(this.filtrar(data, 'abertaEm')); this.carregando.set(false); },
-        error: () => this.carregando.set(false)
+        error: (e) => this.falhou(e)
       });
     } else if (tipo === 'diarios') {
-      this.usuarioService.listarDiarios(this.filtroVeiculoId() || undefined).subscribe({
-        next: (data) => { this.diariosPDF(this.filtrar(data, 'abertoEm')); this.carregando.set(false); },
-        error: () => this.carregando.set(false)
+      this.diarioService.listarDiarios(this.filtroVeiculoId() || undefined).subscribe({
+        next: (data) => { const r = this.diariosDoRelatorio(data); this.diariosPDF(r.diarios, r.pendentes); this.carregando.set(false); },
+        error: (e) => this.falhou(e)
       });
     }
   }
@@ -156,10 +162,10 @@ export class RelatoriosComponent implements OnInit {
       startY: 38,
       head: [['Nome', 'Login', 'Perfil', 'Matrícula', 'Vínculo', 'Secretaria', 'Cat. CNH', 'Validade CNH', 'Telefone', 'Status']],
       body: this.usuarios().map(u => [
-        u.nomeCompleto, u.login, u.perfil,
+        u.nomeCompleto, u.login, rotuloPerfil(u.perfil),
         u.matricula ?? '-', u.vinculo ?? '-', u.secretariaNome ?? '-',
         u.categoriaCnh ?? '-',
-        u.validadeCnh ? new Date(u.validadeCnh).toLocaleDateString('pt-BR') : '-',
+        formatarDataSemHora(u.validadeCnh),
         u.telefone ?? '-', u.ativo ? 'Ativo' : 'Inativo'
       ]),
       styles: { fontSize: 7 },
@@ -169,118 +175,13 @@ export class RelatoriosComponent implements OnInit {
     this.carregando.set(false);
   }
 
-  gerarRelatorioVeiculosSelecionados(): void {
-    if (this.veiculosSelecionados.length === 0) return;
-    this.carregando.set(true);
-
-    const requests = this.veiculosSelecionados.map(id =>
-      forkJoin({
-        abastecimentos: this.usuarioService.listarAbastecimentosPorVeiculo(id),
-        ocorrencias: this.usuarioService.listarOcorrenciasPorVeiculo(id),
-        manutencoes: this.usuarioService.listarManutencoesPorVeiculo(id)
-      })
-    );
-
-    let concluidos = 0;
-    this.veiculosSelecionados.forEach((id, index) => {
-      const veiculo = this.veiculos().find(v => v.id === id)!;
-      forkJoin({
-        abastecimentos: this.usuarioService.listarAbastecimentosPorVeiculo(id),
-        ocorrencias: this.usuarioService.listarOcorrenciasPorVeiculo(id),
-        manutencoes: this.usuarioService.listarManutencoesPorVeiculo(id)
-      }).subscribe({
-        next: (data) => {
-          this.gerarPDFVeiculoIndividual(veiculo, data.abastecimentos, data.ocorrencias, data.manutencoes);
-          concluidos++;
-          if (concluidos === this.veiculosSelecionados.length) this.carregando.set(false);
-        },
-        error: () => { concluidos++; if (concluidos === this.veiculosSelecionados.length) this.carregando.set(false); }
-      });
-    });
-  }
-
-  private gerarPDFVeiculoIndividual(
-    v: VeiculoResponse,
-    abastecimentos: AbastecimentoDetalhado[],
-    ocorrencias: OcorrenciaDetalhada[],
-    manutencoes: ManutencaoResponse[]
-  ): void {
-    const doc = new jsPDF({ orientation: 'landscape' });
-    const unidade = v.tipoMedidor === 'horimetro' ? 'h' : 'km';
-
-    doc.setFontSize(16); doc.setTextColor(63, 81, 181);
-    doc.text('Secretaria de Obras — Cruz Machado/PR', 14, 15);
-    doc.setFontSize(13); doc.setTextColor(0, 0, 0);
-    doc.text(`Relatório do Veículo: ${v.descricao}`, 14, 23);
-    doc.setFontSize(9); doc.setTextColor(100, 100, 100);
-    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 30);
-
-    autoTable(doc, {
-      startY: 36,
-      head: [['Descrição', 'Marca/Modelo', 'Ano', 'Placa', 'Medidor', 'Status']],
-      body: [[v.descricao, `${v.marca ?? '-'} ${v.modelo ?? ''}`.trim(), v.ano?.toString() ?? '-', v.placa ?? 'S/P', `${v.medidorAtual} ${unidade}`, this.labelStatus(v.status)]],
-      styles: { fontSize: 8 }, headStyles: { fillColor: [63, 81, 181] }
-    });
-
-    // Resumo
-    const yRes = (doc as any).lastAutoTable.finalY + 6;
-    autoTable(doc, {
-      startY: yRes,
-      head: [['Abastecimentos', 'Total Litros', 'Gasto Combustível', 'Ocorrências', 'Manutenções', 'Custo Manutenções']],
-      body: [[
-        abastecimentos.length.toString(),
-        `${abastecimentos.reduce((a, b) => a + b.litros, 0).toFixed(1)} L`,
-        `R$ ${abastecimentos.reduce((a, b) => a + b.valorTotal, 0).toFixed(2)}`,
-        ocorrencias.length.toString(),
-        manutencoes.length.toString(),
-        `R$ ${manutencoes.reduce((a, b) => a + b.custoTotal, 0).toFixed(2)}`
-      ]],
-      styles: { fontSize: 8 }, headStyles: { fillColor: [100, 116, 139] }
-    });
-
-    if (abastecimentos.length > 0) {
-      const y = (doc as any).lastAutoTable.finalY + 6;
-      doc.setFontSize(10); doc.setTextColor(0,0,0); doc.text('Abastecimentos', 14, y);
-      autoTable(doc, {
-        startY: y + 4,
-        head: [['Data', 'Motorista', 'Combustível', 'Litros', 'Valor', 'Posto']],
-        body: abastecimentos.map(a => [this.formatarData(a.registradoEm), a.motoristaNome, a.tipoCombustivel, `${a.litros.toFixed(1)} L`, `R$ ${a.valorTotal.toFixed(2)}`, a.posto ?? '-']),
-        styles: { fontSize: 7 }, headStyles: { fillColor: [63, 81, 181] }
-      });
-    }
-
-    if (ocorrencias.length > 0) {
-      const y = (doc as any).lastAutoTable.finalY + 6;
-      doc.setFontSize(10); doc.text('Ocorrências', 14, y);
-      autoTable(doc, {
-        startY: y + 4,
-        head: [['Data', 'Motorista', 'Tipo', 'Descrição']],
-        body: ocorrencias.map(o => [this.formatarData(o.registradoEm), o.motoristaNome, o.tipo, o.descricao]),
-        styles: { fontSize: 7 }, headStyles: { fillColor: [239, 68, 68] }
-      });
-    }
-
-    if (manutencoes.length > 0) {
-      const y = (doc as any).lastAutoTable.finalY + 6;
-      doc.setFontSize(10); doc.text('Manutenções', 14, y);
-      autoTable(doc, {
-        startY: y + 4,
-        head: [['Data', 'Tipo', 'Descrição', 'Mecânico', 'Total', 'Status']],
-        body: manutencoes.map(m => [this.formatarData(m.abertaEm), m.tipo, m.descricao, m.mecanicoResponsavel ?? '-', `R$ ${m.custoTotal.toFixed(2)}`, m.status]),
-        styles: { fontSize: 7 }, headStyles: { fillColor: [245, 158, 11] }
-      });
-    }
-
-    doc.save(`relatorio_${v.descricao.replace(/\s+/g, '_').toLowerCase()}_${new Date().toISOString().slice(0, 10)}.pdf`);
-  }
-
   // ==================== ANÁLISES ====================
 
   gerarCustosGerais(): void {
     this.carregando.set(true);
     forkJoin({
-      abastecimentos: this.usuarioService.listarAbastecimentos(),
-      manutencoes: this.usuarioService.listarManutencoes()
+      abastecimentos: this.abastecimentoService.listarAbastecimentos(),
+      manutencoes: this.manutencaoService.listarManutencoes()
     }).subscribe({
       next: ({ abastecimentos, manutencoes }) => {
         const porVeiculo: Record<string, { descricao: string; placa: string | null; litros: number; custoCombus: number; custoManut: number }> = {};
@@ -301,15 +202,15 @@ export class RelatoriosComponent implements OnInit {
           head: [['Veículo', 'Placa', 'Litros', 'Custo Combustível', 'Custo Manutenção', 'Total Geral']],
           body: lista.map(v => [
             v.descricao, v.placa ?? 'S/P',
-            `${v.litros.toFixed(1)} L`,
-            `R$ ${v.custoCombus.toFixed(2)}`,
-            `R$ ${v.custoManut.toFixed(2)}`,
-            `R$ ${(v.custoCombus + v.custoManut).toFixed(2)}`
+            `${formatarNumero(v.litros, 1)} L`,
+            `${formatarMoeda(v.custoCombus)}`,
+            `${formatarMoeda(v.custoManut)}`,
+            `${formatarMoeda((v.custoCombus + v.custoManut))}`
           ]),
-          foot: [['Total', '', `${lista.reduce((a, b) => a + b.litros, 0).toFixed(1)} L`,
-            `R$ ${lista.reduce((a, b) => a + b.custoCombus, 0).toFixed(2)}`,
-            `R$ ${lista.reduce((a, b) => a + b.custoManut, 0).toFixed(2)}`,
-            `R$ ${lista.reduce((a, b) => a + b.custoCombus + b.custoManut, 0).toFixed(2)}`
+          foot: [['Total', '', `${formatarNumero(lista.reduce((a, b) => a + b.litros, 0), 1)} L`,
+            `${formatarMoeda(lista.reduce((a, b) => a + b.custoCombus, 0))}`,
+            `${formatarMoeda(lista.reduce((a, b) => a + b.custoManut, 0))}`,
+            `${formatarMoeda(lista.reduce((a, b) => a + b.custoCombus + b.custoManut, 0))}`
           ]],
           styles: { fontSize: 8 }, headStyles: { fillColor: [63, 81, 181] },
           footStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' }
@@ -317,48 +218,56 @@ export class RelatoriosComponent implements OnInit {
         doc.save(`custos_gerais_${new Date().toISOString().slice(0, 10)}.pdf`);
         this.carregando.set(false);
       },
-      error: () => this.carregando.set(false)
+      error: (e) => this.falhou(e)
     });
   }
 
   gerarRankingMotoristas(): void {
     this.carregando.set(true);
     forkJoin({
-      abastecimentos: this.usuarioService.listarAbastecimentos(),
-      ocorrencias: this.usuarioService.listarOcorrencias(),
-      diarios: this.usuarioService.listarDiarios()
+      abastecimentos: this.abastecimentoService.listarAbastecimentos(),
+      ocorrencias: this.ocorrenciaService.listarOcorrencias(),
+      diarios: this.diarioService.listarDiarios()
     }).subscribe({
       next: ({ abastecimentos, ocorrencias, diarios }) => {
-        const porMotorista: Record<string, { nome: string; kmRodado: number; abastecimentos: number; litros: number; ocorrencias: number; diarios: number }> = {};
+        const porMotorista: Record<string, { nome: string; kmRodado: number; horas: number; abastecimentos: number; litros: number; ocorrencias: number; diarios: number }> = {};
+        const novo = (nome: string) => ({ nome, kmRodado: 0, horas: 0, abastecimentos: 0, litros: 0, ocorrencias: 0, diarios: 0 });
+        // O diário não traz o tipo de medidor: busca pelo veículo (pela descrição, como no Custo por Km).
+        const ehHorimetro = (descricao: string) =>
+          this.veiculos().find(v => v.descricao === descricao)?.tipoMedidor === 'horimetro';
 
-        diarios.forEach(d => {
-          if (!porMotorista[d.motoristaNome]) porMotorista[d.motoristaNome] = { nome: d.motoristaNome, kmRodado: 0, abastecimentos: 0, litros: 0, ocorrencias: 0, diarios: 0 };
-          porMotorista[d.motoristaNome].kmRodado += d.medidorPercorrido ?? 0;
+        // Só diários completos (fechados + assinados), a mesma regra do relatório de diários.
+        // Km (hodômetro) e horas (horímetro das máquinas) ficam em colunas separadas: não se somam.
+        diariosParaRelatorio(diarios, false).diarios.forEach(d => {
+          porMotorista[d.motoristaNome] ??= novo(d.motoristaNome);
+          if (ehHorimetro(d.veiculoDescricao)) porMotorista[d.motoristaNome].horas += d.medidorPercorrido ?? 0;
+          else porMotorista[d.motoristaNome].kmRodado += d.medidorPercorrido ?? 0;
           porMotorista[d.motoristaNome].diarios += 1;
         });
 
         abastecimentos.forEach(a => {
-          if (!porMotorista[a.motoristaNome]) porMotorista[a.motoristaNome] = { nome: a.motoristaNome, kmRodado: 0, abastecimentos: 0, litros: 0, ocorrencias: 0, diarios: 0 };
+          porMotorista[a.motoristaNome] ??= novo(a.motoristaNome);
           porMotorista[a.motoristaNome].abastecimentos += 1;
           porMotorista[a.motoristaNome].litros += a.litros;
         });
 
         ocorrencias.forEach(o => {
-          if (!porMotorista[o.motoristaNome]) porMotorista[o.motoristaNome] = { nome: o.motoristaNome, kmRodado: 0, abastecimentos: 0, litros: 0, ocorrencias: 0, diarios: 0 };
+          porMotorista[o.motoristaNome] ??= novo(o.motoristaNome);
           porMotorista[o.motoristaNome].ocorrencias += 1;
         });
 
-        const lista = Object.values(porMotorista).sort((a, b) => b.kmRodado - a.kmRodado);
+        const lista = Object.values(porMotorista).sort((a, b) => b.kmRodado - a.kmRodado || b.horas - a.horas);
         const doc = this.criarPDF('Ranking de Motoristas', false);
         autoTable(doc, {
           startY: 38,
-          head: [['Motorista', 'Diários', 'Km/h Rodado', 'Abastecimentos', 'Litros', 'Ocorrências']],
+          head: [['Motorista', 'Diários', 'Km rodados', 'Horas trabalhadas', 'Abastecimentos', 'Litros', 'Ocorrências']],
           body: lista.map((m, i) => [
             `${i + 1}º ${m.nome}`,
             m.diarios.toString(),
-            m.kmRodado.toFixed(1),
+            `${formatarNumero(m.kmRodado, 1)} km`,
+            `${formatarNumero(m.horas, 1)} h`,
             m.abastecimentos.toString(),
-            `${m.litros.toFixed(1)} L`,
+            `${formatarNumero(m.litros, 1)} L`,
             m.ocorrencias.toString()
           ]),
           styles: { fontSize: 8 }, headStyles: { fillColor: [63, 81, 181] }
@@ -366,13 +275,13 @@ export class RelatoriosComponent implements OnInit {
         doc.save(`ranking_motoristas_${new Date().toISOString().slice(0, 10)}.pdf`);
         this.carregando.set(false);
       },
-      error: () => this.carregando.set(false)
+      error: (e) => this.falhou(e)
     });
   }
 
   gerarPecasMaisUsadas(): void {
     this.carregando.set(true);
-    this.usuarioService.listarManutencoes().subscribe({
+    this.manutencaoService.listarManutencoes().subscribe({
       next: (manutencoes) => {
         const pecasMap: Record<string, { nome: string; codigo: string | null; marca: string | null; qtdTotal: number; vezes: number; valorTotal: number }> = {};
         manutencoes.forEach(m => {
@@ -393,20 +302,20 @@ export class RelatoriosComponent implements OnInit {
           body: lista.map((p, i) => [
             `${i + 1}º ${p.nome}`, p.codigo ?? '-', p.marca ?? '-',
             p.qtdTotal.toString(), p.vezes.toString(),
-            `R$ ${p.valorTotal.toFixed(2)}`
+            `${formatarMoeda(p.valorTotal)}`
           ]),
           styles: { fontSize: 8 }, headStyles: { fillColor: [63, 81, 181] }
         });
         doc.save(`pecas_mais_usadas_${new Date().toISOString().slice(0, 10)}.pdf`);
         this.carregando.set(false);
       },
-      error: () => this.carregando.set(false)
+      error: (e) => this.falhou(e)
     });
   }
 
   gerarVeiculosMaisManutencoes(): void {
     this.carregando.set(true);
-    this.usuarioService.listarManutencoes().subscribe({
+    this.manutencaoService.listarManutencoes().subscribe({
       next: (manutencoes) => {
         const porVeiculo: Record<string, { descricao: string; placa: string | null; total: number; custo: number; abertas: number }> = {};
         manutencoes.forEach(m => {
@@ -424,22 +333,22 @@ export class RelatoriosComponent implements OnInit {
           body: lista.map((v, i) => [
             `${i + 1}º`, v.descricao, v.placa ?? 'S/P',
             v.total.toString(), v.abertas.toString(),
-            `R$ ${v.custo.toFixed(2)}`
+            `${formatarMoeda(v.custo)}`
           ]),
           styles: { fontSize: 8 }, headStyles: { fillColor: [63, 81, 181] }
         });
         doc.save(`veiculos_manutencoes_${new Date().toISOString().slice(0, 10)}.pdf`);
         this.carregando.set(false);
       },
-      error: () => this.carregando.set(false)
+      error: (e) => this.falhou(e)
     });
   }
 
   gerarGastosPorMes(): void {
     this.carregando.set(true);
     forkJoin({
-      abastecimentos: this.usuarioService.listarAbastecimentos(),
-      manutencoes: this.usuarioService.listarManutencoes()
+      abastecimentos: this.abastecimentoService.listarAbastecimentos(),
+      manutencoes: this.manutencaoService.listarManutencoes()
     }).subscribe({
       next: ({ abastecimentos, manutencoes }) => {
         const porMes: Record<string, { mes: string; combustivel: number; manutencao: number; litros: number }> = {};
@@ -470,15 +379,15 @@ export class RelatoriosComponent implements OnInit {
           startY: 38,
           head: [['Mês/Ano', 'Litros', 'Combustível', 'Manutenção', 'Total']],
           body: lista.map(m => [
-            m.mes, `${m.litros.toFixed(1)} L`,
-            `R$ ${m.combustivel.toFixed(2)}`,
-            `R$ ${m.manutencao.toFixed(2)}`,
-            `R$ ${(m.combustivel + m.manutencao).toFixed(2)}`
+            m.mes, `${formatarNumero(m.litros, 1)} L`,
+            `${formatarMoeda(m.combustivel)}`,
+            `${formatarMoeda(m.manutencao)}`,
+            `${formatarMoeda((m.combustivel + m.manutencao))}`
           ]),
-          foot: [['Total', `${lista.reduce((a, b) => a + b.litros, 0).toFixed(1)} L`,
-            `R$ ${lista.reduce((a, b) => a + b.combustivel, 0).toFixed(2)}`,
-            `R$ ${lista.reduce((a, b) => a + b.manutencao, 0).toFixed(2)}`,
-            `R$ ${lista.reduce((a, b) => a + b.combustivel + b.manutencao, 0).toFixed(2)}`
+          foot: [['Total', `${formatarNumero(lista.reduce((a, b) => a + b.litros, 0), 1)} L`,
+            `${formatarMoeda(lista.reduce((a, b) => a + b.combustivel, 0))}`,
+            `${formatarMoeda(lista.reduce((a, b) => a + b.manutencao, 0))}`,
+            `${formatarMoeda(lista.reduce((a, b) => a + b.combustivel + b.manutencao, 0))}`
           ]],
           styles: { fontSize: 8 }, headStyles: { fillColor: [63, 81, 181] },
           footStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' }
@@ -486,16 +395,16 @@ export class RelatoriosComponent implements OnInit {
         doc.save(`gastos_por_mes_${new Date().toISOString().slice(0, 10)}.pdf`);
         this.carregando.set(false);
       },
-      error: () => this.carregando.set(false)
+      error: (e) => this.falhou(e)
     });
   }
 
   gerarCustoPorKm(): void {
     this.carregando.set(true);
     forkJoin({
-      abastecimentos: this.usuarioService.listarAbastecimentos(),
-      manutencoes: this.usuarioService.listarManutencoes(),
-      diarios: this.usuarioService.listarDiarios()
+      abastecimentos: this.abastecimentoService.listarAbastecimentos(),
+      manutencoes: this.manutencaoService.listarManutencoes(),
+      diarios: this.diarioService.listarDiarios()
     }).subscribe({
       next: ({ abastecimentos, manutencoes, diarios }) => {
         const porVeiculo: Record<string, { descricao: string; placa: string | null; km: number; custoCombus: number; custoManut: number }> = {};
@@ -526,63 +435,89 @@ export class RelatoriosComponent implements OnInit {
           startY: 38,
           head: [['Veículo', 'Placa', 'Km Rodado', 'Custo Combustível', 'Custo Manutenção', 'Total', 'R$/Km']],
           body: lista.map(v => [
-            v.descricao, v.placa ?? 'S/P', v.km.toFixed(1),
-            `R$ ${v.custoCombus.toFixed(2)}`, `R$ ${v.custoManut.toFixed(2)}`,
-            `R$ ${(v.custoCombus + v.custoManut).toFixed(2)}`,
-            `R$ ${v.custoPorKm.toFixed(2)}`
+            v.descricao, v.placa ?? 'S/P', formatarNumero(v.km, 1),
+            `${formatarMoeda(v.custoCombus)}`, `${formatarMoeda(v.custoManut)}`,
+            `${formatarMoeda((v.custoCombus + v.custoManut))}`,
+            `${formatarMoeda(v.custoPorKm)}`
           ]),
           styles: { fontSize: 8 }, headStyles: { fillColor: [63, 81, 181] }
         });
         doc.save(`custo_por_km_${new Date().toISOString().slice(0, 10)}.pdf`);
         this.carregando.set(false);
       },
-      error: () => this.carregando.set(false)
+      error: (e) => this.falhou(e)
     });
   }
 
   // ==================== FILTRO ====================
 
-  private filtrar(lista: any[], campoData: string): any[] {
+  // Diários: o veículo já vai como parâmetro para a API (a resposta não traz veiculoId),
+  // então aqui só filtra o período e aplica a regra fechados + assinados.
+  private diariosDoRelatorio(data: DiarioResponse[]): { diarios: DiarioResponse[]; pendentes: number } {
+    return diariosParaRelatorio(this.filtrar(data, 'abertoEm', false), this.somenteAssinados());
+  }
+
+  // Os diários não trazem veiculoId (o filtro de veículo deles vai para a API).
+  private filtrar<T extends object>(lista: T[], campoData: keyof T, filtrarVeiculo = true): T[] {
     let resultado = lista;
-    if (this.filtroInicio()) {
-      const inicio = new Date(this.filtroInicio());
-      resultado = resultado.filter(i => i[campoData] && new Date(i[campoData]) >= inicio);
+    const inicio = inicioDoDiaLocal(this.filtroInicio());
+    if (inicio) {
+      resultado = resultado.filter(i => { const d = i[campoData] as string | null; return !!d && new Date(d) >= inicio; });
     }
-    if (this.filtroFim()) {
-      const fim = new Date(this.filtroFim());
-      fim.setHours(23, 59, 59);
-      resultado = resultado.filter(i => i[campoData] && new Date(i[campoData]) <= fim);
+    const fim = fimDoDiaLocal(this.filtroFim());
+    if (fim) {
+      resultado = resultado.filter(i => { const d = i[campoData] as string | null; return !!d && new Date(d) <= fim; });
     }
-    if (this.filtroVeiculoId()) {
-      resultado = resultado.filter(i => i['veiculoId'] === this.filtroVeiculoId());
+    if (filtrarVeiculo && this.filtroVeiculoId()) {
+      resultado = resultado.filter(i => (i as { veiculoId?: string }).veiculoId === this.filtroVeiculoId());
     }
     return resultado;
   }
 
   // ==================== CSV HELPERS ====================
 
+  // CSV no formato do Excel em português (ver shared/utils/csv.ts). Textos que vêm de pessoas usam texto(),
+  // números usam numero() e o que o sistema gera (datas, situação) usa fixo().
   private abastecimentosParaCSV(data: AbastecimentoDetalhado[]): string {
-    const header = 'Data,Motorista,Veículo,Placa,Combustível,Litros,Valor Total,Posto\n';
-    const rows = data.map(a => `${this.formatarData(a.registradoEm)},${a.motoristaNome},${a.veiculoDescricao},${a.veiculoPlaca ?? ''},${a.tipoCombustivel},${a.litros},${a.valorTotal},${a.posto ?? ''}`).join('\n');
-    return header + rows;
+    return montarCsv(
+      ['Data', 'Motorista', 'Veículo', 'Placa', 'Combustível', 'Litros', 'Valor Total', 'Posto'],
+      data.map((a): CelulaCsv[] => [
+        fixo(dataHoraCsv(a.registradoEm)), texto(a.motoristaNome), texto(a.veiculoDescricao), texto(a.veiculoPlaca),
+        texto(a.tipoCombustivel), numero(a.litros, 2), numero(a.valorTotal, 2), texto(a.posto)
+      ])
+    );
   }
 
   private ocorrenciasParaCSV(data: OcorrenciaDetalhada[]): string {
-    const header = 'Data,Motorista,Veículo,Placa,Tipo,Descrição\n';
-    const rows = data.map(o => `${this.formatarData(o.registradoEm)},${o.motoristaNome},${o.veiculoDescricao},${o.veiculoPlaca ?? ''},${o.tipo},"${o.descricao}"`).join('\n');
-    return header + rows;
+    return montarCsv(
+      ['Data', 'Motorista', 'Veículo', 'Placa', 'Tipo', 'Descrição'],
+      data.map((o): CelulaCsv[] => [
+        fixo(dataHoraCsv(o.registradoEm)), texto(o.motoristaNome), texto(o.veiculoDescricao), texto(o.veiculoPlaca),
+        texto(o.tipo), texto(o.descricao)
+      ])
+    );
   }
 
   private manutencoesParaCSV(data: ManutencaoResponse[]): string {
-    const header = 'Data,Veículo,Placa,Tipo,Descrição,Mecânico,Oficina,Custo MO,Custo Peças,Total,Status\n';
-    const rows = data.map(m => `${this.formatarData(m.abertaEm)},${m.veiculoDescricao},${m.veiculoPlaca ?? ''},${m.tipo},"${m.descricao}",${m.mecanicoResponsavel ?? ''},${m.oficina ?? ''},${m.custoMaoObra},${m.custoPecas},${m.custoTotal},${m.status}`).join('\n');
-    return header + rows;
+    return montarCsv(
+      ['Data', 'Veículo', 'Placa', 'Tipo', 'Descrição', 'Mecânico', 'Oficina', 'Custo MO', 'Custo Peças', 'Total', 'Status'],
+      data.map((m): CelulaCsv[] => [
+        fixo(dataHoraCsv(m.abertaEm)), texto(m.veiculoDescricao), texto(m.veiculoPlaca), texto(m.tipo), texto(m.descricao),
+        texto(m.mecanicoResponsavel), texto(m.oficina), numero(m.custoMaoObra, 2), numero(m.custoPecas, 2),
+        numero(m.custoTotal, 2), texto(m.status)
+      ])
+    );
   }
 
   private diariosParaCSV(data: DiarioResponse[]): string {
-    const header = 'Data Abertura,Data Fechamento,Motorista,Veículo,Placa,Destino,Med. Inicial,Med. Final,Percorrido,Status\n';
-    const rows = data.map(d => `${this.formatarData(d.abertoEm)},${this.formatarData(d.fechadoEm)},${d.motoristaNome},${d.veiculoDescricao},${d.veiculoPlaca ?? ''},${d.destino ?? ''},${d.medidorInicial},${d.medidorFinal ?? ''},${d.medidorPercorrido ?? ''},${d.status}`).join('\n');
-    return header + rows;
+    return montarCsv(
+      ['Data Abertura', 'Data Fechamento', 'Motorista', 'Veículo', 'Placa', 'Destino', 'Med. Inicial', 'Med. Final', 'Percorrido', 'Situação'],
+      data.map((d): CelulaCsv[] => [
+        fixo(dataHoraCsv(d.abertoEm)), fixo(dataHoraCsv(d.fechadoEm)), texto(d.motoristaNome), texto(d.veiculoDescricao),
+        texto(d.veiculoPlaca), texto(d.destino), numero(d.medidorInicial), numero(d.medidorFinal), numero(d.medidorPercorrido),
+        fixo(rotuloStatusDiario(d.status))
+      ])
+    );
   }
 
   private downloadCSV(csv: string, nome: string): void {
@@ -616,8 +551,8 @@ export class RelatoriosComponent implements OnInit {
     autoTable(doc, {
       startY: 42,
       head: [['Data', 'Motorista', 'Veículo', 'Combustível', 'Litros', 'Valor', 'Posto']],
-      body: data.map(a => [this.formatarData(a.registradoEm), a.motoristaNome, `${a.veiculoDescricao}${a.veiculoPlaca ? ' — ' + a.veiculoPlaca : ''}`, a.tipoCombustivel, `${a.litros.toFixed(1)} L`, `R$ ${a.valorTotal.toFixed(2)}`, a.posto ?? '-']),
-      foot: [['', '', '', 'Total', `${data.reduce((acc, a) => acc + a.litros, 0).toFixed(1)} L`, `R$ ${data.reduce((acc, a) => acc + a.valorTotal, 0).toFixed(2)}`, '']],
+      body: data.map(a => [this.formatarData(a.registradoEm), a.motoristaNome, rotuloVeiculo(a.veiculoDescricao, a.veiculoPlaca), a.tipoCombustivel, `${formatarNumero(a.litros, 1)} L`, `${formatarMoeda(a.valorTotal)}`, a.posto ?? '-']),
+      foot: [['', '', '', 'Total', `${formatarNumero(data.reduce((acc, a) => acc + a.litros, 0), 1)} L`, `${formatarMoeda(data.reduce((acc, a) => acc + a.valorTotal, 0))}`, '']],
       styles: { fontSize: 8 }, headStyles: { fillColor: [63, 81, 181] },
       footStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' }
     });
@@ -629,7 +564,7 @@ export class RelatoriosComponent implements OnInit {
     autoTable(doc, {
       startY: 42,
       head: [['Data', 'Motorista', 'Veículo', 'Tipo', 'Descrição']],
-      body: data.map(o => [this.formatarData(o.registradoEm), o.motoristaNome, `${o.veiculoDescricao}${o.veiculoPlaca ? ' — ' + o.veiculoPlaca : ''}`, o.tipo, o.descricao]),
+      body: data.map(o => [this.formatarData(o.registradoEm), o.motoristaNome, rotuloVeiculo(o.veiculoDescricao, o.veiculoPlaca), o.tipo, o.descricao]),
       styles: { fontSize: 8 }, headStyles: { fillColor: [63, 81, 181] }
     });
     doc.save(`ocorrencias_${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -640,21 +575,26 @@ export class RelatoriosComponent implements OnInit {
     autoTable(doc, {
       startY: 42,
       head: [['Data', 'Veículo', 'Tipo', 'Descrição', 'Mecânico', 'MO', 'Peças', 'Total', 'Status']],
-      body: data.map(m => [this.formatarData(m.abertaEm), `${m.veiculoDescricao}${m.veiculoPlaca ? ' — ' + m.veiculoPlaca : ''}`, m.tipo, m.descricao, m.mecanicoResponsavel ?? '-', `R$ ${m.custoMaoObra.toFixed(2)}`, `R$ ${m.custoPecas.toFixed(2)}`, `R$ ${m.custoTotal.toFixed(2)}`, m.status]),
-      foot: [['', '', '', '', 'Total', `R$ ${data.reduce((acc, m) => acc + m.custoMaoObra, 0).toFixed(2)}`, `R$ ${data.reduce((acc, m) => acc + m.custoPecas, 0).toFixed(2)}`, `R$ ${data.reduce((acc, m) => acc + m.custoTotal, 0).toFixed(2)}`, '']],
+      body: data.map(m => [this.formatarData(m.abertaEm), rotuloVeiculo(m.veiculoDescricao, m.veiculoPlaca), m.tipo, m.descricao, m.mecanicoResponsavel ?? '-', `${formatarMoeda(m.custoMaoObra)}`, `${formatarMoeda(m.custoPecas)}`, `${formatarMoeda(m.custoTotal)}`, m.status]),
+      foot: [['', '', '', '', 'Total', `${formatarMoeda(data.reduce((acc, m) => acc + m.custoMaoObra, 0))}`, `${formatarMoeda(data.reduce((acc, m) => acc + m.custoPecas, 0))}`, `${formatarMoeda(data.reduce((acc, m) => acc + m.custoTotal, 0))}`, '']],
       styles: { fontSize: 8 }, headStyles: { fillColor: [63, 81, 181] },
       footStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' }
     });
     doc.save(`manutencoes_${new Date().toISOString().slice(0, 10)}.pdf`);
   }
 
-  private diariosPDF(data: DiarioResponse[]): void {
+  private diariosPDF(data: DiarioResponse[], pendentes: number): void {
     const doc = this.criarPDF('Relatório de Lançamento Mensal');
+    const aviso = avisoPendentes(pendentes, this.somenteAssinados());
+    if (aviso) {
+      doc.setFontSize(10); doc.setTextColor(180, 83, 9);
+      doc.text(aviso, 14, 42);
+    }
     autoTable(doc, {
-      startY: 42,
-      head: [['Data Abertura', 'Fechamento', 'Motorista', 'Veículo', 'Destino', 'Med. Inicial', 'Med. Final', 'Percorrido', 'Status']],
-      body: data.map(d => [this.formatarData(d.abertoEm), this.formatarData(d.fechadoEm), d.motoristaNome, `${d.veiculoDescricao}${d.veiculoPlaca ? ' — ' + d.veiculoPlaca : ''}`, d.destino ?? '-', d.medidorInicial.toFixed(1), d.medidorFinal?.toFixed(1) ?? '-', d.medidorPercorrido?.toFixed(1) ?? '-', d.status]),
-      foot: [['', '', '', '', 'Total percorrido', '', '', `${data.reduce((acc, d) => acc + (d.medidorPercorrido ?? 0), 0).toFixed(1)}`, '']],
+      startY: aviso ? 47 : 42,
+      head: [['Data Abertura', 'Fechamento', 'Motorista', 'Veículo', 'Destino', 'Med. Inicial', 'Med. Final', 'Percorrido', 'Situação']],
+      body: data.map(d => [this.formatarData(d.abertoEm), this.formatarData(d.fechadoEm), d.motoristaNome, rotuloVeiculo(d.veiculoDescricao, d.veiculoPlaca), d.destino ?? '-', formatarNumero(d.medidorInicial, 1), formatarNumero(d.medidorFinal, 1) ?? '-', formatarNumero(d.medidorPercorrido, 1) ?? '-', rotuloStatusDiario(d.status)]),
+      foot: [['', '', '', '', 'Total percorrido', '', '', `${formatarNumero(data.reduce((acc, d) => acc + (d.medidorPercorrido ?? 0), 0), 1)}`, '']],
       styles: { fontSize: 8 }, headStyles: { fillColor: [63, 81, 181] },
       footStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' }
     });
@@ -662,16 +602,13 @@ export class RelatoriosComponent implements OnInit {
   }
 
   private labelStatus(status: string): string {
-    const map: any = { 'disponivel': 'Disponível', 'em_uso': 'Em uso', 'em_manutencao': 'Em manutenção', 'inativo': 'Inativo' };
-    return map[status] ?? status;
+    return rotuloStatusVeiculo(status);
   }
+
+  labelVeiculo(v: VeiculoResponse): string { return rotuloVeiculo(v.descricao, v.placa); }
 
   private formatarData(data: string | null | undefined): string {
     if (!data) return '-';
     return new Date(data).toLocaleString('pt-BR');
   }
-  adicionarVeiculoPorId(id: string): void {
-  if (!id || this.veiculosSelecionados.includes(id)) return;
-  this.veiculosSelecionados = [...this.veiculosSelecionados, id];
-}
 }

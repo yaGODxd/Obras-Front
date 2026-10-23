@@ -1,0 +1,21 @@
+@if (motivos().length) {
+  @if (detalhado()) {
+    <div class="alert alert-warning alert-soft items-start text-sm" role="note">
+      <i class="ti ti-clock-exclamation text-lg" aria-hidden="true"></i>
+      <div>
+        <p class="font-medium">Horário a conferir</p>
+        <p class="text-xs">Registro feito offline: a hora é a do celular. Nada foi bloqueado.</p>
+        <ul class="list-disc ml-4 mt-1">
+          @for (m of motivos(); track $index) {
+            <li>{{ m }}</li>
+          }
+        </ul>
+        @if (registro().recebidoEm) {
+          <p class="text-xs mt-1">Recebido pelo servidor em {{ registro().recebidoEm | date:'dd/MM/yyyy HH:mm' }}</p>
+        }
+      </div>
+    </div>
+  } @else {
+    <app-status-badge texto="Horário a conferir" cor="badge-warning badge-outline badge-xs" icone="ti-clock-exclamation" [titulo]="explicacao()" />
+  }
+}

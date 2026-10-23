@@ -1,0 +1,12 @@
+@if (url() && !falhou()) {
+  <div class="avatar">
+    <div class="{{ classes().caixa }} rounded-full {{ classe() }}">
+      <img [src]="url()" [alt]="'Foto de ' + nome()" (error)="falhou.set(true)" />
+    </div>
+  </div>
+} @else {
+  <div class="{{ classes().caixa }} {{ corInicial() }} rounded-full flex items-center justify-center leading-none select-none {{ classe() }}"
+       role="img" [attr.aria-label]="nome()">
+    <span class="{{ classes().texto }} font-bold" aria-hidden="true">{{ letras() }}</span>
+  </div>
+}

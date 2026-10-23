@@ -1,0 +1,7 @@
+<span class="badge {{ cor() }} h-auto min-h-(--size) py-0.5 gap-1 max-w-full min-w-0 whitespace-nowrap"
+      [title]="titulo() ?? texto()">
+  @if (icone()) {
+    <i class="ti {{ icone() }} shrink-0" aria-hidden="true"></i>
+  }
+  <span class="truncate">{{ texto() }}</span>
+</span>

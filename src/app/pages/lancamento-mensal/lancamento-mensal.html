@@ -10,12 +10,12 @@
   <div class="card bg-base-100 shadow mb-6">
     <div class="card-body p-4">
       <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <select class="select select-bordered w-full"
+        <select class="select select-bordered w-full" aria-label="Mês"
           [ngModel]="filtroMes()" (ngModelChange)="filtroMes.set(+$event)">
           <option value="0">Todos os meses</option>
           @for (m of meses; track m.valor) { <option [value]="m.valor">{{ m.label }}</option> }
         </select>
-        <select class="select select-bordered w-full"
+        <select class="select select-bordered w-full" aria-label="Ano"
           [ngModel]="filtroAno()" (ngModelChange)="filtroAno.set(+$event)">
           <option value="0">Todos os anos</option>
           @for (a of anos(); track a) { <option [value]="a">{{ a }}</option> }
@@ -23,13 +23,13 @@
         <div class="relative">
           <label class="input input-bordered flex items-center gap-2 w-full">
             <i class="ti ti-truck text-base-content/40"></i>
-            <input type="text" class="grow" placeholder="Buscar veículo..."
+            <input type="text" class="grow" placeholder="Buscar veículo..." aria-label="Buscar veículo"
               [ngModel]="buscaVeiculo()"
               (ngModelChange)="buscaVeiculo.set($event); mostrarSugestoes.set(true); filtroVeiculoId.set('')"
               (focus)="mostrarSugestoes.set(true)"
               (blur)="$event.relatedTarget ? null : mostrarSugestoes.set(false)" />
             @if (filtroVeiculoId()) {
-              <button class="btn btn-ghost btn-xs" (click)="limparVeiculo()"><i class="ti ti-x"></i></button>
+              <button class="btn btn-ghost btn-xs" aria-label="Limpar veículo" (click)="limparVeiculo()"><i class="ti ti-x"></i></button>
             }
           </label>
           @if (mostrarSugestoes() && veiculosFiltradosBusca().length > 0) {
@@ -82,6 +82,8 @@
       <div class="card-body">
         @if (carregando()) {
           <div class="flex justify-center py-16"><span class="loading loading-spinner loading-lg text-primary"></span></div>
+        } @else if (erroResumos()) {
+          <app-erro-carregar [mensagem]="erroResumos()" (tentarDeNovo)="buscar()" />
         } @else if (resumos().length === 0) {
           <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
             <i class="ti ti-clipboard-list text-6xl"></i><p class="font-medium">Nenhum registro encontrado para o período</p>
@@ -94,7 +96,7 @@
               </thead>
               <tbody>
                 @for (r of resumos(); track r.veiculoId + r.mes + r.ano) {
-                  <tr class="cursor-pointer hover" (click)="verDiarios(r)">
+                  <tr class="cursor-pointer hover" appClicavel (click)="verDiarios(r)">
                     <td>
                       <p class="font-medium">{{ r.veiculoDescricao }}</p>
                       @if (r.veiculoPlaca) { <span class="badge badge-outline badge-xs mt-1">{{ r.veiculoPlaca }}</span> }
@@ -104,7 +106,7 @@
                     <td class="font-medium">{{ r.primeiroMedidor | number:'1.1-1' }} {{ getMedidorUnidade(r) }}</td>
                     <td class="font-medium">{{ r.ultimoMedidor | number:'1.1-1' }} {{ getMedidorUnidade(r) }}</td>
                     <td class="font-bold text-info">{{ r.totalPercorrido | number:'1.1-1' }} {{ getMedidorUnidade(r) }}</td>
-                    <td class="text-center"><button class="btn btn-ghost btn-xs"><i class="ti ti-eye"></i></button></td>
+                    <td class="text-center"><span class="btn btn-ghost btn-xs" aria-hidden="true"><i class="ti ti-eye"></i></span></td>
                   </tr>
                 }
               </tbody>
@@ -117,7 +119,7 @@
 
   @if (resumoSelecionado()) {
     <div class="flex items-center gap-3 mb-4">
-      <button class="btn btn-ghost btn-sm" (click)="voltar()"><i class="ti ti-arrow-left"></i></button>
+      <button class="btn btn-ghost btn-sm" aria-label="Voltar para o resumo" (click)="voltar()"><i class="ti ti-arrow-left"></i></button>
       <div>
         <h2 class="text-xl font-bold">
           {{ resumoSelecionado()!.veiculoDescricao }}
@@ -152,6 +154,8 @@
       <div class="card-body">
         @if (carregandoDiarios()) {
           <div class="flex justify-center py-16"><span class="loading loading-spinner loading-lg text-primary"></span></div>
+        } @else if (erroDiarios()) {
+          <app-erro-carregar [mensagem]="erroDiarios()" (tentarDeNovo)="verDiarios(resumoSelecionado()!)" />
         } @else if (diarios().length === 0) {
           <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
             <i class="ti ti-clipboard-list text-6xl"></i><p class="font-medium">Nenhum diário encontrado</p>
@@ -170,7 +174,7 @@
               </thead>
               <tbody>
                 @for (d of diarios(); track d.id) {
-                  <tr>
+                  <tr class="hover" appClicavel (click)="abrirDetalhe(d)" title="Ver detalhes do diário">
                     <td class="text-sm">
                       {{ d.abertoEm | date:'dd/MM/yyyy' }}
                       <p class="text-xs text-base-content/40">{{ d.abertoEm | date:'HH:mm' }}</p>
@@ -181,7 +185,7 @@
                     <td class="font-medium">{{ d.medidorFinal != null ? (d.medidorFinal | number:'1.1-1') : '-' }}</td>
                     <td class="font-bold text-info">{{ d.medidorPercorrido != null ? (d.medidorPercorrido | number:'1.1-1') : '-' }}</td>
                     <td class="text-center">
-                      <span class="badge {{ badgeStatus(d.status) }}">{{ labelStatus(d.status) }}</span>
+                      <app-status-badge [texto]="labelCurto(d.status)" [titulo]="labelStatus(d.status)" [cor]="badgeStatus(d.status)" />
                     </td>
                     <td class="text-center">
                       <button class="btn btn-ghost btn-xs gap-1" (click)="abrirMapa(d, $event)">
@@ -203,17 +207,28 @@
     </div>
   }
 
+  <!-- Modal detalhes do diário (antes dos outros: ao trocar por "Ver rota"/"Checklist", o foco volta para a linha) -->
+  @if (diarioDetalhe(); as d) {
+    <app-modal-diario [diario]="d" [tipoMedidor]="tipoMedidor()"
+      [estado]="detalhes()[d.id] ?? { tipo: 'carregando' }" [verificacao]="verificacoes()[d.id]"
+      (fechar)="fecharDetalhe()" (tentarDeNovo)="carregarDetalhe(d.id)" (verificar)="verificar(d)"
+      (verRota)="verRotaDoDetalhe(d)" (checklist)="checklistDoDetalhe(d)" />
+  }
+
   <!-- Modal mapa -->
   @if (modalMapaAberto()) {
-    <div class="modal modal-open">
+    <div class="modal modal-open" appModal (fechar)="fecharMapa()">
       <div class="modal-box max-w-3xl">
-        <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharMapa()"><i class="ti ti-x"></i></button>
+        <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Fechar" (click)="fecharMapa()"><i class="ti ti-x"></i></button>
         <h3 class="font-bold text-lg mb-1">Rota do Diário</h3>
         @if (diarioSelecionado()) {
           <p class="text-sm text-base-content/60 mb-4">
             {{ diarioSelecionado()!.motoristaNome }} — {{ diarioSelecionado()!.abertoEm | date:'dd/MM/yyyy HH:mm' }}
             @if (diarioSelecionado()!.destino) { — {{ diarioSelecionado()!.destino }} }
           </p>
+        }
+        @if (!carregandoRota()) {
+          <app-legenda-trajeto class="block mb-2" [quantidadePontos]="quantidadePontos()" [situacao]="situacaoTrajeto()" />
         }
         <div class="relative" style="height: 400px;">
           @if (carregandoRota()) {
@@ -231,9 +246,9 @@
 
   <!-- Modal checklist -->
   @if (modalChecklistAberto()) {
-    <div class="modal modal-open">
+    <div class="modal modal-open" appModal (fechar)="fecharChecklist()">
       <div class="modal-box max-w-2xl">
-        <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharChecklist()"><i class="ti ti-x"></i></button>
+        <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Fechar" (click)="fecharChecklist()"><i class="ti ti-x"></i></button>
         <h3 class="font-bold text-lg mb-1">Checklist de Vistoria</h3>
         @if (diarioSelecionado()) {
           <p class="text-sm text-base-content/60 mb-4">
@@ -251,8 +266,7 @@
           <div class="space-y-2">
             @for (r of checklistDiario(); track r.id) {
               <div class="flex items-center gap-3 p-3 rounded-lg"
-                [class.bg-success]="r.ok" [class.bg-error]="!r.ok"
-                style="background-color: {{ r.ok ? 'oklch(var(--su)/0.1)' : 'oklch(var(--er)/0.1)' }}">
+                [class.bg-success/10]="r.ok" [class.bg-error/10]="!r.ok">
                 <i class="ti text-xl"
                   [class.ti-circle-check]="r.ok" [class.text-success]="r.ok"
                   [class.ti-circle-x]="!r.ok" [class.text-error]="!r.ok"></i>
@@ -260,7 +274,7 @@
                   <p class="font-medium text-sm">{{ r.descricao }}</p>
                   @if (r.observacao) { <p class="text-xs text-base-content/60">{{ r.observacao }}</p> }
                 </div>
-                @if (r.obrigatorio) { <span class="badge badge-error badge-xs">Obrigatório</span> }
+                @if (r.obrigatorio) { <app-status-badge class="shrink-0" texto="Obrigatório" cor="badge-error badge-xs" /> }
               </div>
             }
           </div>

@@ -1,0 +1,186 @@
+<div class="p-6">
+
+  <div class="flex items-center gap-3 mb-6">
+    <button class="btn btn-ghost btn-sm" aria-label="Voltar" (click)="voltar()">
+      <i class="ti ti-arrow-left"></i>
+    </button>
+    <div>
+      @if (por === 'motorista') {
+        <h1 class="text-2xl font-bold">Abastecimentos do Motorista</h1>
+        <p class="text-base-content/60 text-sm">&#64;{{ chave }}</p>
+      } @else {
+        <h1 class="text-2xl font-bold">{{ nomeVeiculo() || 'Veículo' }}</h1>
+        @if (placaVeiculo()) {
+          <span class="badge badge-outline">{{ placaVeiculo() }}</span>
+        }
+      }
+    </div>
+  </div>
+
+  @if (carregando()) {
+    <div class="flex justify-center py-16">
+      <span class="loading loading-spinner loading-lg text-primary"></span>
+    </div>
+  } @else if (erroCarregar()) {
+    <div class="card bg-base-100 shadow">
+      <app-erro-carregar [mensagem]="erroCarregar()" (tentarDeNovo)="carregar()" />
+    </div>
+  } @else {
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+
+      <!-- Card infos -->
+      <div class="card bg-base-100 shadow">
+        <div class="card-body">
+          <h2 class="font-bold text-lg mb-3">
+            <i class="ti {{ por === 'motorista' ? 'ti-user' : 'ti-truck' }} text-primary mr-2"></i>
+            Informações
+          </h2>
+          <div class="space-y-3">
+            @if (por === 'motorista') {
+              <div>
+                <p class="text-xs text-base-content/50">Motorista</p>
+                <p class="font-semibold">{{ nomeMotorista() }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-base-content/50">Login</p>
+                <p class="font-medium text-base-content/70">&#64;{{ chave }}</p>
+              </div>
+            } @else {
+              <div>
+                <p class="text-xs text-base-content/50">Veículo</p>
+                <p class="font-semibold">{{ nomeVeiculo() }}</p>
+              </div>
+              @if (placaVeiculo()) {
+                <div>
+                  <p class="text-xs text-base-content/50">Placa</p>
+                  <span class="badge badge-outline">{{ placaVeiculo() }}</span>
+                </div>
+              }
+            }
+            <div class="divider my-1"></div>
+            <div>
+              <p class="text-xs text-base-content/50">Total de abastecimentos</p>
+              <p class="font-bold text-2xl text-primary">{{ abastecimentos().length }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-base-content/50">Total de litros</p>
+              <p class="font-bold text-xl text-info">{{ totalLitros() | number:'1.1-1' }} L</p>
+            </div>
+            <div>
+              <p class="text-xs text-base-content/50">Total gasto</p>
+              <p class="font-bold text-xl text-success">R$ {{ totalValor() | number:'1.2-2' }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Carrossel gráficos -->
+      <div class="card bg-base-100 shadow lg:col-span-2">
+        <div class="card-body p-4">
+
+          <div class="carousel w-full rounded-lg overflow-hidden" style="height: 360px;">
+            <div id="{{ por }}-slide1" class="carousel-item w-full p-3" style="height: 360px;">
+              <canvas #grafico1 style="height: 320px !important; width: 100%;"></canvas>
+            </div>
+            <div id="{{ por }}-slide2" class="carousel-item w-full p-3" style="height: 360px;">
+              <canvas #grafico2 style="height: 320px !important; width: 100%;"></canvas>
+            </div>
+            <div id="{{ por }}-slide3" class="carousel-item w-full p-3" style="height: 360px;">
+              <canvas #grafico3 style="height: 320px !important; width: 100%;"></canvas>
+            </div>
+          </div>
+
+          <div class="flex justify-center gap-2 mt-2">
+            <button class="btn btn-xs" (click)="scrollParaSlide(por + '-slide1')">1</button>
+            <button class="btn btn-xs" (click)="scrollParaSlide(por + '-slide2')">2</button>
+            <button class="btn btn-xs" (click)="scrollParaSlide(por + '-slide3')">3</button>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Barra de pesquisa -->
+    <div class="card bg-base-100 shadow mb-4">
+      <div class="card-body p-4">
+        <label class="input input-bordered flex items-center gap-2 w-full">
+          <i class="ti ti-search text-base-content/40"></i>
+          <input
+            type="text"
+            class="grow"
+            [placeholder]="por === 'motorista' ? 'Buscar por veículo, combustível ou posto...' : 'Buscar por motorista, combustível ou posto...'"
+            aria-label="Buscar abastecimentos"
+            [ngModel]="busca()"
+            (ngModelChange)="busca.set($event)" />
+        </label>
+      </div>
+    </div>
+
+    <!-- Lista -->
+    <div class="card bg-base-100 shadow">
+      <div class="card-body">
+        @if (abastecimentosFiltrados().length === 0) {
+          <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
+            <i class="ti ti-droplet-off text-6xl"></i>
+            <p class="font-medium">Nenhum abastecimento encontrado</p>
+          </div>
+        } @else {
+          <div class="overflow-x-auto">
+            <table class="table table-zebra table-hover">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>{{ por === 'motorista' ? 'Veículo' : 'Motorista' }}</th>
+                  <th>Combustível</th>
+                  <th>Litros</th>
+                  <th>Valor</th>
+                  <th>Posto</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (a of abastecimentosFiltrados(); track a.id) {
+                  <tr class="cursor-pointer hover" appClicavel (click)="abrirModal(a)">
+                    <td class="text-sm">
+                      {{ a.registradoEm | date:'dd/MM/yyyy' }}
+                      <p class="text-xs text-base-content/40">{{ a.registradoEm | date:'HH:mm' }}</p>
+                      <app-selo-horario-suspeito [registro]="a" />
+                    </td>
+                    @if (por === 'motorista') {
+                      <td>
+                        <p class="text-sm font-medium">{{ a.veiculoDescricao }}</p>
+                        @if (a.veiculoPlaca) {
+                          <span class="badge badge-outline badge-xs mt-1">{{ a.veiculoPlaca }}</span>
+                        }
+                      </td>
+                    } @else {
+                      <td class="font-medium">{{ a.motoristaNome }}</td>
+                    }
+                    <td>
+                      <app-status-badge [texto]="a.tipoCombustivel" [cor]="badgeCombustivel(a.tipoCombustivel)" />
+                    </td>
+                    <td class="font-medium">{{ a.litros | number:'1.1-1' }} L</td>
+                    <td>
+                      <p class="font-bold text-success">R$ {{ a.valorTotal | number:'1.2-2' }}</p>
+                      <p class="text-xs text-base-content/40">R$ {{ (a.valorTotal / a.litros) | number:'1.2-2' }}/L</p>
+                    </td>
+                    <td class="text-sm text-base-content/60">{{ a.posto ?? '-' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+
+  }
+
+  @if (selecionado(); as a) {
+    <app-modal-abastecimento [abastecimento]="a"
+      [mostrarMotorista]="por === 'veiculo'" [mostrarVeiculo]="por === 'motorista'"
+      (fechar)="fecharModal()" />
+  }
+
+</div>

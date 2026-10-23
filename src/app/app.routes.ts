@@ -51,16 +51,18 @@ export const routes: Routes = [
   {
     path: 'abastecimentos/motorista/:login',
     canActivate: [authGuard],
+    data: { por: 'motorista' },
     loadComponent: () =>
-      import('./pages/abastecimentos/abastecimento-motorista/abastecimento-motorista')
-        .then(m => m.AbastecimentoMotoristaComponent)
+      import('./pages/abastecimentos/abastecimentos-de/abastecimentos-de')
+        .then(m => m.AbastecimentosDeComponent)
   },
   {
     path: 'abastecimentos/veiculo/:id',
     canActivate: [authGuard],
+    data: { por: 'veiculo' },
     loadComponent: () =>
-      import('./pages/abastecimentos/abastecimento-veiculo/abastecimento-veiculo')
-        .then(m => m.AbastecimentoVeiculoComponent)
+      import('./pages/abastecimentos/abastecimentos-de/abastecimentos-de')
+        .then(m => m.AbastecimentosDeComponent)
   },
   {
     path: 'ocorrencias',
@@ -72,16 +74,18 @@ export const routes: Routes = [
   {
     path: 'ocorrencias/motorista/:login',
     canActivate: [authGuard],
+    data: { por: 'motorista' },
     loadComponent: () =>
-      import('./pages/ocorrencias/ocorrencia-motorista/ocorrencia-motorista')
-        .then(m => m.OcorrenciaMotoristaComponent)
+      import('./pages/ocorrencias/ocorrencias-de/ocorrencias-de')
+        .then(m => m.OcorrenciasDeComponent)
   },
   {
     path: 'ocorrencias/veiculo/:id',
     canActivate: [authGuard],
+    data: { por: 'veiculo' },
     loadComponent: () =>
-      import('./pages/ocorrencias/ocorrencia-veiculo/ocorrencia-veiculo')
-        .then(m => m.OcorrenciaVeiculoComponent)
+      import('./pages/ocorrencias/ocorrencias-de/ocorrencias-de')
+        .then(m => m.OcorrenciasDeComponent)
   },
   {
     path: 'manutencao',
@@ -124,13 +128,6 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./pages/mapa/mapa')
         .then(m => m.MapaComponent)
-  },
-  {
-    path: 'historico-diario',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./pages/historico-diario/historico-diario')
-        .then(m => m.HistoricoDiarioComponent)
   },
   {
     path: 'logs',

@@ -18,19 +18,20 @@
           <input
             type="text"
             class="grow"
-            placeholder="Buscar por descrição ou placa..."
+            placeholder="Buscar por descrição ou placa..." aria-label="Buscar veículos"
             [ngModel]="busca()"
             (ngModelChange)="busca.set($event)" />
         </label>
 
         <select
           class="select select-bordered w-full"
+          aria-label="Filtrar por status"
           [ngModel]="filtroStatus()"
           (ngModelChange)="filtroStatus.set($event)">
           <option value="">Todos os status</option>
-          <option value="disponivel">Disponível</option>
-          <option value="em_uso">Em uso</option>
-          <option value="inativo">Inativo</option>
+          @for (s of statusVeiculo; track s.valor) {
+            <option [value]="s.valor">{{ s.rotulo }}</option>
+          }
         </select>
 
         <button class="btn btn-outline" (click)="limparFiltros()">
@@ -50,6 +51,9 @@
         <div class="flex justify-center py-16">
           <span class="loading loading-spinner loading-lg text-primary"></span>
         </div>
+
+      } @else if (erroCarregar()) {
+        <app-erro-carregar [mensagem]="erroCarregar()" (tentarDeNovo)="carregar()" />
 
       } @else if (veiculosFiltrados().length === 0) {
         <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
@@ -75,7 +79,7 @@
             </thead>
             <tbody>
               @for (v of veiculosPaginados(); track v.id) {
-                <tr class="cursor-pointer hover" (click)="verDetalhe(v.id!)">
+                <tr class="cursor-pointer hover" appClicavel (click)="verDetalhe(v.id!)">
   <td>
     <div class="flex items-center gap-3">
       <div class="shrink-0" [innerHTML]="getSvgVeiculo(v.tipoNome)"></div>
@@ -99,13 +103,11 @@
   </td>
   <td class="text-sm text-base-content/70">{{ v.tipoNome }}</td>
   <td>
-    <span class="badge {{ badgeStatus(v.status) }}">
-      {{ labelStatus(v.status) }}
-    </span>
+    <app-status-badge [texto]="labelStatus(v.status)" [cor]="badgeStatus(v.status)" />
   </td>
   <td class="font-medium">{{ getMedidor(v) }}</td>
   <td class="text-center">
-    <button class="btn btn-ghost btn-xs" (click)="verDetalhe(v.id!); $event.stopPropagation()">
+    <button class="btn btn-ghost btn-xs" [attr.aria-label]="'Ver ' + v.descricao" (click)="verDetalhe(v.id!); $event.stopPropagation()">
       <i class="ti ti-eye"></i>
     </button>
   </td>

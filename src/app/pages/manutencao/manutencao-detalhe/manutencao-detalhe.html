@@ -8,14 +8,14 @@
 
     <!-- Cabeçalho -->
     <div class="flex items-center gap-3 mb-6">
-      <button class="btn btn-ghost btn-sm" (click)="voltar()">
+      <button class="btn btn-ghost btn-sm" aria-label="Voltar para manutenções" (click)="voltar()">
         <i class="ti ti-arrow-left"></i>
       </button>
       <div class="flex-1">
         <div class="flex items-center gap-2 flex-wrap">
           <h1 class="text-2xl font-bold">{{ manutencao()!.veiculoDescricao }}</h1>
-          <span class="badge {{ badgeTipo(manutencao()!.tipo) }}">{{ labelTipo(manutencao()!.tipo) }}</span>
-          <span class="badge {{ badgeStatus(manutencao()!.status) }}">{{ labelStatus(manutencao()!.status) }}</span>
+          <app-status-badge [texto]="labelTipo(manutencao()!.tipo)" [cor]="badgeTipo(manutencao()!.tipo)" />
+          <app-status-badge [texto]="labelStatus(manutencao()!.status)" [cor]="badgeStatus(manutencao()!.status)" />
         </div>
         @if (manutencao()!.veiculoPlaca) {
           <span class="badge badge-outline mt-1">{{ manutencao()!.veiculoPlaca }}</span>
@@ -115,13 +115,14 @@
           <div class="card bg-base-100 shadow">
             <div class="card-body p-4">
               <p class="text-xs text-base-content/50 uppercase mb-3">Atualizar status</p>
-              <select class="select select-bordered select-sm w-full mb-2" [(ngModel)]="novoStatus">
+              <select class="select select-bordered select-sm w-full mb-2" aria-label="Novo status" [(ngModel)]="novoStatus">
                 <option value="aberta">Aberta</option>
                 <option value="em_andamento">Em andamento</option>
                 <option value="concluida">Concluída</option>
               </select>
               <textarea
                 class="textarea textarea-bordered textarea-sm w-full mb-2"
+                aria-label="Observações da mudança de status"
                 rows="2"
                 placeholder="Observações (opcional)"
                 [(ngModel)]="novaObservacao">
@@ -157,6 +158,9 @@
             <p class="font-medium">Nenhuma peça registrada</p>
           </div>
         } @else {
+          @if (concluida()) {
+            <p class="text-sm text-base-content/60 mb-2">Manutenção concluída: as peças não podem mais ser alteradas.</p>
+          }
           <div class="overflow-x-auto">
             <table class="table table-zebra">
               <thead>
@@ -167,6 +171,7 @@
                   <th class="text-center">Qtd</th>
                   <th class="text-right">Valor unit.</th>
                   <th class="text-right">Total</th>
+                  <th><span class="sr-only">Editar</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -178,6 +183,10 @@
                     <td class="text-center">{{ p.quantidade }}</td>
                     <td class="text-right">R$ {{ p.valorUnitario | number:'1.2-2' }}</td>
                     <td class="text-right font-bold text-primary">R$ {{ p.valorTotal | number:'1.2-2' }}</td>
+                    <td class="text-center">
+                      <button class="btn btn-ghost btn-xs" [attr.aria-label]="'Editar ' + p.nomePeca" title="Editar peça"
+                        [disabled]="concluida()" (click)="abrirEdicaoPeca(p)"><i class="ti ti-pencil"></i></button>
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -185,6 +194,7 @@
                 <tr>
                   <td colspan="5" class="text-right font-bold">Total peças:</td>
                   <td class="text-right font-bold text-primary">R$ {{ manutencao()!.custoPecas | number:'1.2-2' }}</td>
+                  <td></td>
                 </tr>
               </tfoot>
             </table>
@@ -197,3 +207,47 @@
   }
 
 </div>
+
+<!-- MODAL EDITAR PEÇA -->
+@if (pecaEditando()) {
+  <div class="modal modal-open" appModal (fechar)="fecharEdicaoPeca()">
+    <div class="modal-box">
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Fechar" (click)="fecharEdicaoPeca()">
+        <i class="ti ti-x"></i>
+      </button>
+      <h3 class="font-bold text-lg mb-4">Editar peça</h3>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="col-span-2 form-control">
+          <label class="label py-1" for="editar-peca-nome"><span class="label-text text-xs">Nome da peça *</span></label>
+          <input id="editar-peca-nome" type="text" class="input input-bordered input-sm" [(ngModel)]="formPeca.nomePeca" />
+        </div>
+        <div class="form-control">
+          <label class="label py-1" for="editar-peca-codigo"><span class="label-text text-xs">Código</span></label>
+          <input id="editar-peca-codigo" type="text" class="input input-bordered input-sm" [(ngModel)]="formPeca.codigoPeca" />
+        </div>
+        <div class="form-control">
+          <label class="label py-1" for="editar-peca-marca"><span class="label-text text-xs">Marca</span></label>
+          <input id="editar-peca-marca" type="text" class="input input-bordered input-sm" [(ngModel)]="formPeca.marcaPeca" />
+        </div>
+        <div class="form-control">
+          <label class="label py-1" for="editar-peca-qtd"><span class="label-text text-xs">Qtd *</span></label>
+          <input id="editar-peca-qtd" type="number" class="input input-bordered input-sm" min="1" [(ngModel)]="formPeca.quantidade" />
+        </div>
+        <div class="form-control">
+          <label class="label py-1" for="editar-peca-valor"><span class="label-text text-xs">Valor unitário (R$) *</span></label>
+          <input id="editar-peca-valor" type="number" class="input input-bordered input-sm" min="0" [(ngModel)]="formPeca.valorUnitario" />
+        </div>
+      </div>
+      <p class="text-sm mt-3">Total da peça: <strong>R$ {{ totalFormPeca() | number:'1.2-2' }}</strong></p>
+      <div class="modal-action">
+        <button class="btn btn-ghost" (click)="fecharEdicaoPeca()">Cancelar</button>
+        <button class="btn btn-primary gap-2" [disabled]="salvandoPeca()" (click)="salvarPeca()">
+          @if (salvandoPeca()) { <span class="loading loading-spinner loading-xs"></span> }
+          <i class="ti ti-device-floppy"></i>
+          Salvar
+        </button>
+      </div>
+    </div>
+    <div class="modal-backdrop" (click)="fecharEdicaoPeca()"></div>
+  </div>
+}

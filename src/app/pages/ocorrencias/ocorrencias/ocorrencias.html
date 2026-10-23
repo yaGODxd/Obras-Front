@@ -52,25 +52,37 @@
   <!-- Filtros -->
   <div class="card bg-base-100 shadow mb-4">
     <div class="card-body p-4">
-      <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
 
         <label class="input input-bordered flex items-center gap-2 sm:col-span-2">
           <i class="ti ti-search text-base-content/40"></i>
           <input
             type="text"
             class="grow"
-            placeholder="Buscar por tipo, motorista, veículo..."
+            placeholder="Buscar por tipo, motorista, veículo..." aria-label="Buscar ocorrências"
             [ngModel]="busca()"
             (ngModelChange)="busca.set($event)" />
         </label>
 
         <select
           class="select select-bordered w-full"
+          aria-label="Filtrar por tipo"
           [ngModel]="filtroTipo()"
           (ngModelChange)="filtroTipo.set($event)">
           <option value="">Todos os tipos</option>
           @for (tipo of tiposOcorrencia(); track tipo) {
             <option [value]="tipo">{{ tipo }}</option>
+          }
+        </select>
+
+        <select
+          class="select select-bordered w-full"
+          aria-label="Filtrar por status"
+          [ngModel]="filtroStatus()"
+          (ngModelChange)="filtroStatus.set($event)">
+          <option value="">Todos os status</option>
+          @for (s of opcoesStatus; track s) {
+            <option [value]="s">{{ rotuloStatus(s) }}</option>
           }
         </select>
 
@@ -83,22 +95,27 @@
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
         <div>
-          <label class="label"><span class="label-text text-xs">Data início</span></label>
-          <input
+          <label class="label" for="filtro-inicio"><span class="label-text text-xs">Data início</span></label>
+          <input id="filtro-inicio"
             type="date"
             class="input input-bordered w-full"
             [ngModel]="filtroInicio()"
             (ngModelChange)="filtroInicio.set($event)" />
         </div>
         <div>
-          <label class="label"><span class="label-text text-xs">Data fim</span></label>
-          <input
+          <label class="label" for="filtro-fim"><span class="label-text text-xs">Data fim</span></label>
+          <input id="filtro-fim"
             type="date"
             class="input input-bordered w-full"
             [ngModel]="filtroFim()"
             (ngModelChange)="filtroFim.set($event)" />
         </div>
       </div>
+
+      <label class="label cursor-pointer justify-start gap-2 mt-2 w-fit">
+        <input type="checkbox" class="checkbox checkbox-sm checkbox-warning" [ngModel]="filtroSuspeito()" (ngModelChange)="filtroSuspeito.set($event)" />
+        <span class="label-text text-sm">Só horário a conferir <span class="text-base-content/50">(registro offline com hora do celular fora do esperado)</span></span>
+      </label>
 
     </div>
   </div>
@@ -111,6 +128,9 @@
         <div class="flex justify-center py-16">
           <span class="loading loading-spinner loading-lg text-primary"></span>
         </div>
+
+      } @else if (erroCarregar()) {
+        <app-erro-carregar [mensagem]="erroCarregar()" (tentarDeNovo)="carregar()" />
 
       } @else if (ocorrenciasFiltradas().length === 0) {
         <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
@@ -127,41 +147,31 @@
                 <th>Motorista</th>
                 <th>Veículo</th>
                 <th>Tipo</th>
+                <th>Status</th>
                 <th>Descrição</th>
                 <th>Localização</th>
               </tr>
             </thead>
             <tbody>
               @for (o of ocorrenciasPaginadas(); track o.id) {
-                <tr class="cursor-pointer hover" (click)="abrirModal(o)">
+                <tr class="cursor-pointer hover" appClicavel (click)="abrirModal(o)">
 
                   <td class="text-sm">
                     {{ o.registradoEm | date:'dd/MM/yyyy' }}
                     <p class="text-xs text-base-content/40">{{ o.registradoEm | date:'HH:mm' }}</p>
+                    <app-selo-horario-suspeito [registro]="o" />
                   </td>
 
                  <td>
-  <div class="flex items-center gap-2" (click)="irParaMotorista(o.motoristaLogin, $event)">
-    @if (o.motoristaFoto) {
-      <div class="avatar">
-        <div class="w-9 h-9 rounded-full">
-          <img [src]="'data:image/jpeg;base64,' + o.motoristaFoto" alt="Foto" />
-        </div>
-      </div>
-    } @else {
-      <div class="avatar placeholder">
-        <div class="bg-primary text-primary-content rounded-full w-9 h-9">
-          <span class="text-sm font-bold">{{ o.motoristaNome.charAt(0) }}</span>
-        </div>
-      </div>
-    }
+  <div class="flex items-center gap-2" appClicavel [attr.aria-label]="'Ocorrências de ' + o.motoristaNome" (click)="irParaMotorista(o.motoristaLogin, $event)">
+    <app-avatar [foto]="o.motoristaFoto" [nome]="o.motoristaNome" />
     <span class="text-sm font-medium hover:text-primary hover:underline">
       {{ o.motoristaNome }}
     </span>
   </div>
 </td>
 
-                  <td (click)="irParaVeiculo(o.veiculoId, $event)">
+                  <td appClicavel (click)="irParaVeiculo(o.veiculoId, $event)">
                     <p class="text-sm font-medium hover:text-primary hover:underline">
                       {{ o.veiculoDescricao }}
                     </p>
@@ -171,9 +181,11 @@
                   </td>
 
                   <td>
-                    <span class="badge {{ getCorTipo(o.tipo) }}">
-                      {{ o.tipo }}
-                    </span>
+                    <app-status-badge [texto]="o.tipo" [cor]="badgeTipoOcorrencia(o.tipo)" />
+                  </td>
+
+                  <td>
+                    <app-status-badge [texto]="rotuloStatus(status(o))" [cor]="badgeStatus(status(o))" />
                   </td>
 
                   <td class="text-sm text-base-content/70 max-w-xs truncate">
@@ -182,10 +194,7 @@
 
                   <td>
                     @if (o.latitude && o.longitude) {
-                      <span class="badge badge-success gap-1">
-                        <i class="ti ti-map-pin text-xs"></i>
-                        GPS
-                      </span>
+                      <app-status-badge texto="GPS" cor="badge-success" icone="ti-map-pin" titulo="Ocorrência com localização" />
                     } @else {
                       <span class="text-base-content/30 text-sm">-</span>
                     }
@@ -208,77 +217,8 @@
   </div>
 
   <!-- Modal -->
-  @if (selecionada()) {
-    <div class="modal modal-open">
-      <div class="modal-box max-w-2xl">
-
-        <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModal()">
-          <i class="ti ti-x"></i>
-        </button>
-
-        <h3 class="font-bold text-lg mb-4">Detalhes da Ocorrência</h3>
-
-        <div class="space-y-3 mb-4">
-
-          <div class="flex justify-between items-center">
-            <span class="text-base-content/60 text-sm">Data</span>
-            <span class="font-medium">{{ selecionada()!.registradoEm | date:'dd/MM/yyyy HH:mm' }}</span>
-          </div>
-
-          <div class="flex justify-between items-center">
-            <span class="text-base-content/60 text-sm">Motorista</span>
-            <span class="font-medium">{{ selecionada()!.motoristaNome }}</span>
-          </div>
-
-          <div class="flex justify-between items-center">
-            <span class="text-base-content/60 text-sm">Veículo</span>
-            <span class="font-medium">{{ selecionada()!.veiculoDescricao }}</span>
-          </div>
-
-          @if (selecionada()!.veiculoPlaca) {
-            <div class="flex justify-between items-center">
-              <span class="text-base-content/60 text-sm">Placa</span>
-              <span class="badge badge-outline">{{ selecionada()!.veiculoPlaca }}</span>
-            </div>
-          }
-
-          <div class="flex justify-between items-center">
-            <span class="text-base-content/60 text-sm">Tipo</span>
-            <span class="badge {{ getCorTipo(selecionada()!.tipo) }}">{{ selecionada()!.tipo }}</span>
-          </div>
-
-          <div class="divider my-1"></div>
-
-          <div>
-            <p class="text-base-content/60 text-sm mb-1">Descrição</p>
-            <p class="text-sm">{{ selecionada()!.descricao }}</p>
-          </div>
-
-        </div>
-
-        <!-- Mapa -->
-        @if (selecionada()!.latitude && selecionada()!.longitude) {
-          <div class="mt-4">
-            <p class="text-base-content/60 text-sm mb-2">
-              <i class="ti ti-map-pin mr-1"></i>
-              Local da ocorrência
-            </p>
-            <div id="mapa-ocorrencia" style="height: 250px; border-radius: 12px; z-index: 0;"></div>
-          </div>
-        } @else {
-          <div class="mt-4 flex items-center gap-2 text-base-content/40">
-            <i class="ti ti-map-pin-off"></i>
-            <span class="text-sm">Sem localização registrada</span>
-          </div>
-        }
-
-        <div class="modal-action">
-          <button class="btn" (click)="fecharModal()">Fechar</button>
-        </div>
-
-      </div>
-      <div class="modal-backdrop" (click)="fecharModal()"></div>
-    </div>
+  @if (selecionada(); as o) {
+    <app-modal-ocorrencia [ocorrencia]="o" (fechar)="fecharModal()" (statusAlterado)="aoAlterarStatus($event)" />
   }
 
 </div>

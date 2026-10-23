@@ -1,0 +1,25 @@
+<div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/70">
+  <span class="flex items-center gap-1.5">
+    <span class="inline-block w-5 h-1 rounded" [style.background]="cores.ajustado" aria-hidden="true"></span>
+    Linha ajustada às ruas
+  </span>
+  @if (situacao() === 'aproximado') {
+    <span class="flex items-center gap-1.5">
+      <span class="inline-block w-5 border-t-2 border-dashed" [style.border-color]="cores.reta" aria-hidden="true"></span>
+      Linha reta entre os pontos reais
+    </span>
+  }
+  <span class="flex items-center gap-1.5">
+    <span class="inline-block w-2.5 h-2.5 rounded-full border border-white" [style.background]="cores.ponto" aria-hidden="true"></span>
+    Pontos reais ({{ quantidadePontos() }})
+  </span>
+  @if (situacao() === 'calculando') {
+    <span class="flex items-center gap-1" role="status">
+      <span class="loading loading-spinner loading-xs" aria-hidden="true"></span> Ajustando às ruas…
+    </span>
+  } @else if (situacao() === 'aproximado') {
+    <span class="flex items-center gap-1 text-warning" role="status">
+      <i class="ti ti-alert-triangle" aria-hidden="true"></i> traçado aproximado (pontos reais)
+    </span>
+  }
+</div>

@@ -1,14 +1,35 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal, computed, linkedSignal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule, Router } from '@angular/router';
+import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { PaginacaoComponent } from '../../shared/components/paginacao/paginacao';
-import { UsuarioService, ManutencaoResponse, ManutencaoRequest, PecaRequest, VeiculoResponse, OcorrenciaDetalhada, MecanicoResponse, PostoResponse } from '../../services/usuario';
+import { CadastrosService } from '../../services/cadastros';
+import { ManutencaoService } from '../../services/manutencao';
+import { OcorrenciaService } from '../../services/ocorrencia';
+import { VeiculoService } from '../../services/veiculo';
+import { MecanicoResponse, PostoResponse } from '../../interfaces/cadastros';
+import { ManutencaoRequest, ManutencaoResponse, PecaRequest } from '../../interfaces/manutencao';
+import { OcorrenciaDetalhada } from '../../interfaces/ocorrencia';
+import { VeiculoResponse } from '../../interfaces/veiculo';
+import { ErroCarregarComponent } from '../../shared/components/erro-carregar/erro-carregar';
+import { AvisosService } from '../../shared/services/avisos';
+import { mensagemDeErro } from '../../shared/utils/erros';
+import { badgeStatusManutencao, badgeTipoManutencao, rotuloStatusManutencao, rotuloTipoManutencao } from '../../shared/utils/manutencoes';
+import { lerComoBase64, validarArquivoFoto } from '../../shared/utils/imagem';
+import {
+  indiceEdicaoAposRemover, removerPecaDaLista, substituirPeca, totalDaPeca, totalDasPecas,
+  totalGeralManutencao, validarPeca
+} from '../../shared/utils/pecas';
+import { rotuloVeiculo } from '../../shared/utils/placa';
+import { badgeStatusOcorrencia, rotuloStatusOcorrencia, statusDaOcorrencia } from '../../shared/utils/ocorrencias';
+import { ModalDirective } from '../../shared/directives/modal';
+import { ClicavelDirective } from '../../shared/directives/clicavel';
+import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge';
 
 @Component({
   selector: 'app-manutencao',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, PaginacaoComponent],
+  imports: [CommonModule, FormsModule, PaginacaoComponent, ErroCarregarComponent, ModalDirective, ClicavelDirective, StatusBadgeComponent],
   templateUrl: './manutencao.html',
   styleUrl: './manutencao.css'
 })
@@ -18,8 +39,10 @@ export class Manutencao implements OnInit {
   veiculos = signal<VeiculoResponse[]>([]);
   mecanicos = signal<MecanicoResponse[]>([]);
   postos = signal<PostoResponse[]>([]);
-  fotoNotaFiscal: string | null = null;
+  // Signal: muda depois do FileReader (o app roda sem zone.js; um campo comum não atualizaria a prévia).
+  fotoNotaFiscal = signal<string | null>(null);
   carregando = signal(true);
+  erroCarregar = signal('');
   modalAberto = signal(false);
   salvando = signal(false);
 
@@ -30,9 +53,15 @@ export class Manutencao implements OnInit {
   novaManutencao: ManutencaoRequest = this.resetForm();
   pecasForm: PecaRequest[] = [];
   novaPeca: PecaRequest = this.resetPeca();
+  // Posição da peça que está sendo editada no formulário (null = adicionando uma nova).
+  indicePecaEmEdicao = signal<number | null>(null);
   ocorrenciaId = '';
 
-  paginaAtual = signal(1);
+  // Volta para a página 1 sempre que a busca ou um filtro muda.
+  paginaAtual = linkedSignal({
+    source: () => [this.busca(), this.filtroTipo(), this.filtroStatus()],
+    computation: () => 1
+  });
   readonly porPagina = 10;
 
   ocorrencias = signal<OcorrenciaDetalhada[]>([]);
@@ -69,10 +98,12 @@ export class Manutencao implements OnInit {
     this.manutencoesFiltradas().reduce((acc, m) => acc + m.custoTotal, 0)
   );
 
+  // Só ocorrências que ainda precisam de manutenção (resolvidas ficam de fora).
   ocorrenciasFiltradas = computed(() => {
+    const abertas = this.ocorrencias().filter(o => statusDaOcorrencia(o) !== 'resolvida');
     const termo = this.buscaOcorrencia().toLowerCase();
-    if (!termo) return this.ocorrencias();
-    return this.ocorrencias().filter(o =>
+    if (!termo) return abertas;
+    return abertas.filter(o =>
       o.tipo.toLowerCase().includes(termo) ||
       o.descricao.toLowerCase().includes(termo) ||
       o.motoristaNome.toLowerCase().includes(termo) ||
@@ -82,31 +113,41 @@ export class Manutencao implements OnInit {
 
   constructor(
     private router: Router,
-    private usuarioService: UsuarioService
+    private cadastrosService: CadastrosService, private manutencaoService: ManutencaoService, private ocorrenciaService: OcorrenciaService, private veiculoService: VeiculoService,
+    private avisos: AvisosService
   ) {}
 
   ngOnInit(): void {
     this.carregarDados();
   }
 
-  private carregarDados(): void {
-    this.usuarioService.listarManutencoes().subscribe({
+  carregarManutencoes(): void {
+    this.carregando.set(true);
+    this.erroCarregar.set('');
+    this.manutencaoService.listarManutencoes().subscribe({
       next: (data) => {
         this.manutencoes.set(data);
         this.carregando.set(false);
       },
-      error: () => this.carregando.set(false)
+      error: (e) => {
+        this.erroCarregar.set(mensagemDeErro(e));
+        this.carregando.set(false);
+      }
     });
+  }
 
-    this.usuarioService.listarVeiculos().subscribe({
+  private carregarDados(): void {
+    this.carregarManutencoes();
+
+    this.veiculoService.listarVeiculos().subscribe({
       next: (data) => this.veiculos.set(data)
     });
 
-    this.usuarioService.listarMecanicos().subscribe({
+    this.cadastrosService.listarMecanicos().subscribe({
       next: (data) => this.mecanicos.set(data)
     });
 
-    this.usuarioService.listarPostos().subscribe({
+    this.cadastrosService.listarPostos().subscribe({
       next: (data) => this.postos.set(data)
     });
   }
@@ -140,8 +181,9 @@ export class Manutencao implements OnInit {
     this.novaManutencao = this.resetForm();
     this.pecasForm = [];
     this.novaPeca = this.resetPeca();
+    this.indicePecaEmEdicao.set(null);
     this.ocorrenciaId = '';
-    this.fotoNotaFiscal = null;
+    this.fotoNotaFiscal.set(null);
     this.modalAberto.set(true);
   }
 
@@ -149,42 +191,84 @@ export class Manutencao implements OnInit {
     this.modalAberto.set(false);
   }
 
-  adicionarPeca(): void {
-    if (!this.novaPeca.nomePeca || this.novaPeca.quantidade <= 0) return;
-    this.pecasForm.push({ ...this.novaPeca });
+  // ─── peças (lista LOCAL do modal; a API só recebe ao salvar a manutenção) ──
+
+  // Botão do formulário de peças: adiciona uma nova ou salva a alteração da peça em edição.
+  salvarPeca(): void {
+    const problema = validarPeca(this.novaPeca);
+    if (problema) { this.avisos.erro(problema); return; }
+    const emEdicao = this.indicePecaEmEdicao();
+    this.pecasForm = emEdicao === null
+      ? [...this.pecasForm, { ...this.novaPeca }]
+      : substituirPeca(this.pecasForm, emEdicao, this.novaPeca);
+    this.cancelarEdicaoPeca();
+  }
+
+  // Lápis: carrega a peça nos campos de cima (se outra estava em edição, ela é descartada).
+  editarPeca(index: number): void {
+    this.novaPeca = { ...this.pecasForm[index] };
+    this.indicePecaEmEdicao.set(index);
+    document.getElementById('peca-nome')?.focus();
+  }
+
+  cancelarEdicaoPeca(): void {
     this.novaPeca = this.resetPeca();
+    this.indicePecaEmEdicao.set(null);
   }
 
   removerPeca(index: number): void {
-    this.pecasForm.splice(index, 1);
+    const emEdicao = indiceEdicaoAposRemover(this.indicePecaEmEdicao(), index);
+    this.pecasForm = removerPecaDaLista(this.pecasForm, index);
+    if (emEdicao === null && this.indicePecaEmEdicao() !== null) {
+      this.cancelarEdicaoPeca(); // removeram a peça que estava em edição
+    } else {
+      this.indicePecaEmEdicao.set(emEdicao);
+    }
+  }
+
+  totalPeca(p: PecaRequest): number {
+    return totalDaPeca(p);
   }
 
   totalPecas(): number {
-    return this.pecasForm.reduce((acc, p) => acc + (p.quantidade * p.valorUnitario), 0);
+    return totalDasPecas(this.pecasForm);
   }
 
   totalGeral(): number {
-    return (this.novaManutencao.custoMaoObra ?? 0) + this.totalPecas();
+    return totalGeralManutencao(this.novaManutencao.custoMaoObra, this.pecasForm);
   }
 
   salvar(): void {
-    if (!this.novaManutencao.veiculoId || !this.novaManutencao.descricao) return;
+    if (!this.novaManutencao.veiculoId || !this.novaManutencao.descricao?.trim()) {
+      this.avisos.erro('Preencha os campos obrigatórios: veículo e descrição.');
+      return;
+    }
+    if ((this.novaManutencao.custoMaoObra ?? 0) < 0) {
+      this.avisos.erro('O custo de mão de obra não pode ser negativo.');
+      return;
+    }
 
     this.salvando.set(true);
     const request: ManutencaoRequest = {
       ...this.novaManutencao,
       ocorrenciaId: this.ocorrenciaId || null,
-      fotoNotaFiscal: this.fotoNotaFiscal,
+      fotoNotaFiscal: this.fotoNotaFiscal(),
       pecas: this.pecasForm
     };
 
-    this.usuarioService.abrirManutencao(request).subscribe({
+    this.manutencaoService.abrirManutencao(request).subscribe({
       next: (data) => {
         this.manutencoes.update(lista => [data, ...lista]);
+        // A ocorrência ligada mudou de status na API: a lista é buscada de novo na próxima vez.
+        if (request.ocorrenciaId) this.ocorrencias.set([]);
         this.fecharModal();
         this.salvando.set(false);
+        this.avisos.sucesso('Manutenção aberta.');
       },
-      error: () => this.salvando.set(false)
+      error: (e) => {
+        this.salvando.set(false);
+        this.avisos.erroHttp(e);
+      }
     });
   }
 
@@ -207,23 +291,31 @@ export class Manutencao implements OnInit {
     const input = event.target as HTMLInputElement;
     if (!input.files?.length) return;
     const file = input.files[0];
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = (reader.result as string).split(',')[1];
-      this.fotoNotaFiscal = base64;
-    };
-    reader.readAsDataURL(file);
+    // Nota fiscal: só limite de tamanho e formato (não reduz, para continuar legível).
+    const problema = validarArquivoFoto(file);
+    if (problema) {
+      this.avisos.erro(problema);
+      input.value = '';
+      return;
+    }
+    lerComoBase64(file)
+      .then(base64 => this.fotoNotaFiscal.set(base64))
+      .catch(() => this.avisos.erro('Não foi possível ler a imagem.'));
   }
 
   limparFotoNota(): void {
-    this.fotoNotaFiscal = null;
+    this.fotoNotaFiscal.set(null);
   }
 
   abrirModalOcorrencia(): void {
     this.modalOcorrencia.set(true);
     if (this.ocorrencias().length === 0) {
-      this.usuarioService.listarOcorrencias().subscribe({
-        next: (data) => this.ocorrencias.set(data)
+      this.ocorrenciaService.listarOcorrencias().subscribe({
+        next: (data) => this.ocorrencias.set(data),
+        error: (e) => {
+          this.avisos.erroHttp(e);
+          this.fecharModalOcorrencia();
+        }
       });
     }
   }
@@ -244,29 +336,11 @@ export class Manutencao implements OnInit {
     this.ocorrenciaSelecionadaNome.set('');
   }
 
-  badgeStatus(status: string): string {
-    const map: any = {
-      'aberta': 'badge-error',
-      'em_andamento': 'badge-warning',
-      'concluida': 'badge-success'
-    };
-    return map[status] ?? 'badge-ghost';
-  }
-
-  labelStatus(status: string): string {
-    const map: any = {
-      'aberta': 'Aberta',
-      'em_andamento': 'Em andamento',
-      'concluida': 'Concluída'
-    };
-    return map[status] ?? status;
-  }
-
-  badgeTipo(tipo: string): string {
-    return tipo === 'preventiva' ? 'badge-info' : 'badge-warning';
-  }
-
-  labelTipo(tipo: string): string {
-    return tipo === 'preventiva' ? 'Preventiva' : 'Corretiva';
-  }
+  badgeStatus(status: string): string { return badgeStatusManutencao(status); }
+  labelStatus(status: string): string { return rotuloStatusManutencao(status); }
+  badgeTipo(tipo: string): string { return badgeTipoManutencao(tipo); }
+  labelTipo(tipo: string): string { return rotuloTipoManutencao(tipo); }
+  badgeStatusOcorrencia(o: OcorrenciaDetalhada): string { return badgeStatusOcorrencia(statusDaOcorrencia(o)); }
+  labelStatusOcorrencia(o: OcorrenciaDetalhada): string { return rotuloStatusOcorrencia(statusDaOcorrencia(o)); }
+  labelVeiculo(v: VeiculoResponse): string { return rotuloVeiculo(v.descricao, v.placa); }
 }

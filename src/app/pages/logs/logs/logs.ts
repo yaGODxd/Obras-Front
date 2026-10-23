@@ -1,13 +1,18 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal, computed, linkedSignal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { UsuarioService, LogResponse } from '../../../services/usuario';
+import { LogService } from '../../../services/log';
+import { LogResponse } from '../../../interfaces/log';
 import { PaginacaoComponent } from '../../../shared/components/paginacao/paginacao';
+import { ErroCarregarComponent } from '../../../shared/components/erro-carregar/erro-carregar';
+import { mensagemDeErro } from '../../../shared/utils/erros';
+import { AvatarComponent } from '../../../shared/components/avatar/avatar';
+import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge';
 
 @Component({
   selector: 'app-logs',
   standalone: true,
-  imports: [CommonModule, FormsModule, PaginacaoComponent],
+  imports: [CommonModule, FormsModule, PaginacaoComponent, ErroCarregarComponent, AvatarComponent, StatusBadgeComponent],
   templateUrl: './logs.html',
   styleUrl: './logs.css'
 })
@@ -15,6 +20,7 @@ export class LogsComponent implements OnInit {
 
   logs = signal<LogResponse[]>([]);
   carregando = signal(true);
+  erroCarregar = signal('');
   busca = signal('');
   filtroAcao = signal('');
   filtroInicio = signal('');
@@ -49,7 +55,7 @@ export class LogsComponent implements OnInit {
     return lista;
   });
 
-  constructor(private usuarioService: UsuarioService) {}
+  constructor(private logService: LogService) {}
 
   ngOnInit(): void {
     this.carregarLogs();
@@ -57,7 +63,8 @@ export class LogsComponent implements OnInit {
 
   carregarLogs(): void {
     this.carregando.set(true);
-    this.usuarioService.listarLogs(
+    this.erroCarregar.set('');
+    this.logService.listarLogs(
       undefined,
       undefined,
       this.filtroInicio() || undefined,
@@ -67,7 +74,10 @@ export class LogsComponent implements OnInit {
         this.logs.set(data);
         this.carregando.set(false);
       },
-      error: () => this.carregando.set(false)
+      error: (e) => {
+        this.erroCarregar.set(mensagemDeErro(e));
+        this.carregando.set(false);
+      }
     });
   }
 
@@ -85,7 +95,7 @@ export class LogsComponent implements OnInit {
   }
 
   getCorAcao(acao: string): string {
-    const map: any = {
+    const map: Record<string, string> = {
       'LOGIN': 'badge-success',
       'CADASTRO': 'badge-info',
       'ATUALIZAR_PERFIL': 'badge-info',
@@ -100,7 +110,7 @@ export class LogsComponent implements OnInit {
   }
 
   getLabelAcao(acao: string): string {
-    const map: any = {
+    const map: Record<string, string> = {
       'LOGIN': 'Login',
       'CADASTRO': 'Cadastro',
       'ATUALIZAR_PERFIL': 'Perfil',
@@ -114,7 +124,11 @@ export class LogsComponent implements OnInit {
     return map[acao] ?? acao;
   }
 
-  paginaAtual = signal(1);
+  // Volta para a página 1 quando a busca, a ação ou a lista (novo período) muda.
+  paginaAtual = linkedSignal({
+    source: () => [this.busca(), this.filtroAcao(), this.logs()],
+    computation: () => 1
+  });
 readonly porPagina = 10;
 
 logsPaginados = computed(() => {

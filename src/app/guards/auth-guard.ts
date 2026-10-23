@@ -7,14 +7,17 @@ export const authGuard: CanActivateFn = () => {
   const router = inject(Router);
 
   if (!auth.estaLogado()) {
-    router.navigate(['/login']);
-    return false;
+    return router.createUrlTree(['/login']);
+  }
+
+  if (!auth.tokenValido()) {
+    auth.logout();
+    return router.createUrlTree(['/login'], { queryParams: { motivo: 'sessao-expirada' } });
   }
 
   if (auth.getPerfil() !== 'gestor') {
     auth.logout();
-    router.navigate(['/login']);
-    return false;
+    return router.createUrlTree(['/login']);
   }
 
   return true;

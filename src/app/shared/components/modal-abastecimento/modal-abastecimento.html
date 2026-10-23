@@ -1,0 +1,68 @@
+@let a = abastecimento();
+<div class="modal modal-open" appModal (fechar)="fechar.emit()">
+  <div class="modal-box">
+
+    <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Fechar" (click)="fechar.emit()">
+      <i class="ti ti-x"></i>
+    </button>
+
+    <h3 class="font-bold text-lg mb-4">Detalhes do Abastecimento</h3>
+
+    <div class="space-y-3">
+      <div class="flex justify-between items-center">
+        <span class="text-base-content/60 text-sm">Data</span>
+        <span class="font-medium">{{ a.registradoEm | date:'dd/MM/yyyy HH:mm' }}</span>
+      </div>
+      <app-selo-horario-suspeito [registro]="a" [detalhado]="true" />
+      @if (mostrarMotorista()) {
+        <div class="flex justify-between items-center">
+          <span class="text-base-content/60 text-sm">Motorista</span>
+          <span class="font-medium">{{ a.motoristaNome }}</span>
+        </div>
+      }
+      @if (mostrarVeiculo()) {
+        <div class="flex justify-between items-center">
+          <span class="text-base-content/60 text-sm">Veículo</span>
+          <span class="font-medium">{{ a.veiculoDescricao }}</span>
+        </div>
+        @if (a.veiculoPlaca) {
+          <div class="flex justify-between items-center">
+            <span class="text-base-content/60 text-sm">Placa</span>
+            <span class="badge badge-outline">{{ a.veiculoPlaca }}</span>
+          </div>
+        }
+      }
+      <div class="flex justify-between items-center">
+        <span class="text-base-content/60 text-sm">Combustível</span>
+        <app-status-badge [texto]="a.tipoCombustivel" [cor]="badgeCombustivel(a.tipoCombustivel)" />
+      </div>
+      <div class="divider my-1"></div>
+      <div class="flex justify-between items-center">
+        <span class="text-base-content/60 text-sm">Litros</span>
+        <span class="font-medium">{{ a.litros | number:'1.1-1' }} L</span>
+      </div>
+      <div class="flex justify-between items-center">
+        <span class="text-base-content/60 text-sm">Valor total</span>
+        <span class="font-bold text-success text-lg">R$ {{ a.valorTotal | number:'1.2-2' }}</span>
+      </div>
+      <div class="flex justify-between items-center">
+        <span class="text-base-content/60 text-sm">Valor por litro</span>
+        <span class="font-medium">R$ {{ (a.valorTotal / a.litros) | number:'1.2-2' }}/L</span>
+      </div>
+      @if (a.posto) {
+        <div class="divider my-1"></div>
+        <div class="flex justify-between items-center">
+          <span class="text-base-content/60 text-sm">Posto</span>
+          <span class="font-medium">{{ a.posto }}</span>
+        </div>
+      }
+    </div>
+
+    <div class="modal-action">
+      <ng-content select="[acoes]" />
+      <button class="btn" (click)="fechar.emit()">Fechar</button>
+    </div>
+
+  </div>
+  <div class="modal-backdrop" (click)="fechar.emit()"></div>
+</div>

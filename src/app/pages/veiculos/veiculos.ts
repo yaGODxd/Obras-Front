@@ -1,15 +1,22 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal, computed, linkedSignal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule, Router } from '@angular/router';
+import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { UsuarioService, VeiculoResponse } from '../../services/usuario';
+import { VeiculoService } from '../../services/veiculo';
+import { VeiculoResponse } from '../../interfaces/veiculo';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { PaginacaoComponent } from '../../shared/components/paginacao/paginacao';
+import { ErroCarregarComponent } from '../../shared/components/erro-carregar/erro-carregar';
+import { mensagemDeErro } from '../../shared/utils/erros';
+import { STATUS_VEICULO, badgeStatusVeiculo, rotuloStatusVeiculo } from '../../shared/utils/veiculos';
+import { ClicavelDirective } from '../../shared/directives/clicavel';
+import { formatarMedidor } from '../../shared/utils/formatos';
+import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge';
 
 @Component({
   selector: 'app-veiculos',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, PaginacaoComponent],
+  imports: [CommonModule, FormsModule, PaginacaoComponent, ErroCarregarComponent, ClicavelDirective, StatusBadgeComponent],
   templateUrl: './veiculos.html',
   styleUrl: './veiculos.css'
 })
@@ -17,9 +24,9 @@ export class Veiculos implements OnInit {
 
   veiculos = signal<VeiculoResponse[]>([]);
   carregando = signal(true);
+  erroCarregar = signal('');
   busca = signal('');
   filtroStatus = signal('');
-  filtroTipo = signal('');
 
   veiculosFiltrados = computed(() => {
     let lista = this.veiculos();
@@ -34,30 +41,31 @@ export class Veiculos implements OnInit {
     if (this.filtroStatus()) {
       lista = lista.filter(v => v.status === this.filtroStatus());
     }
-    if (this.filtroTipo()) {
-      lista = lista.filter(v => v.tipoNome === this.filtroTipo());
-    }
     return lista;
-  });
-
-  tiposDisponiveis = computed(() => {
-    const tipos = new Set(this.veiculos().map(v => v.tipoNome));
-    return Array.from(tipos).sort();
   });
 
   constructor(
     private router: Router,
-    private usuarioService: UsuarioService,
+    private veiculoService: VeiculoService,
     private sanitizer: DomSanitizer
   ) {}
 
   ngOnInit(): void {
-    this.usuarioService.listarVeiculos().subscribe({
+    this.carregar();
+  }
+
+  carregar(): void {
+    this.carregando.set(true);
+    this.erroCarregar.set('');
+    this.veiculoService.listarVeiculos().subscribe({
       next: (data) => {
         this.veiculos.set(data);
         this.carregando.set(false);
       },
-      error: () => this.carregando.set(false)
+      error: (e) => {
+        this.erroCarregar.set(mensagemDeErro(e));
+        this.carregando.set(false);
+      }
     });
   }
 
@@ -65,34 +73,24 @@ export class Veiculos implements OnInit {
     this.paginaAtual.set(1);
     this.busca.set('');
     this.filtroStatus.set('');
-    this.filtroTipo.set('');
   }
 
   verDetalhe(id: string) {
     this.router.navigate(['/veiculos', id]);
   }
 
+  readonly statusVeiculo = STATUS_VEICULO;
+
   badgeStatus(status: string): string {
-    const map: any = {
-      'disponivel': 'badge-success',
-      'em_uso': 'badge-warning',
-      'inativo': 'badge-ghost'
-    };
-    return map[status] ?? 'badge-ghost';
+    return badgeStatusVeiculo(status);
   }
 
   labelStatus(status: string): string {
-    const map: any = {
-      'disponivel': 'Disponível',
-      'em_uso': 'Em uso',
-      'inativo': 'Inativo'
-    };
-    return map[status] ?? status;
+    return rotuloStatusVeiculo(status);
   }
 
   getMedidor(v: VeiculoResponse): string {
-    const unidade = v.tipoMedidor === 'horimetro' ? 'h' : 'km';
-    return `${v.medidorAtual} ${unidade}`;
+    return formatarMedidor(v.medidorAtual, v.tipoMedidor);
   }
 
   getSvgVeiculo(tipoNome: string): SafeHtml {
@@ -147,7 +145,11 @@ export class Veiculos implements OnInit {
     </svg>`;
   }
 
-  paginaAtual = signal(1);
+  // Volta para a página 1 sempre que a busca ou um filtro muda.
+  paginaAtual = linkedSignal({
+    source: () => [this.busca(), this.filtroStatus()],
+    computation: () => 1
+  });
 readonly porPagina = 10;
 
 veiculosPaginados = computed(() => {

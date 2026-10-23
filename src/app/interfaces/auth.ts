@@ -1,3 +1,5 @@
+import { Perfil } from './usuario';
+
 export interface LoginRequest {
   login: string;
   senha: string;
@@ -6,5 +8,5 @@ export interface LoginRequest {
 export interface LoginResponse {
   token: string;
   nome: string;
-  perfil: string;
+  perfil: Perfil;
 }

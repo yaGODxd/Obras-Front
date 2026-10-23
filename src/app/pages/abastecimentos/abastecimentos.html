@@ -83,13 +83,14 @@
           <input
             type="text"
             class="grow"
-            placeholder="Buscar motorista, veículo, placa..."
+            placeholder="Buscar motorista, veículo, placa..." aria-label="Buscar abastecimentos"
             [ngModel]="busca()"
             (ngModelChange)="busca.set($event)" />
         </label>
 
         <select
           class="select select-bordered w-full"
+          aria-label="Filtrar por combustível"
           [ngModel]="filtroTipo()"
           (ngModelChange)="filtroTipo.set($event)">
           <option value="">Todos os combustíveis</option>
@@ -107,22 +108,27 @@
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
         <div>
-          <label class="label"><span class="label-text text-xs">Data início</span></label>
-          <input
+          <label class="label" for="filtro-inicio"><span class="label-text text-xs">Data início</span></label>
+          <input id="filtro-inicio"
             type="date"
             class="input input-bordered w-full"
             [ngModel]="filtroInicio()"
             (ngModelChange)="filtroInicio.set($event)" />
         </div>
         <div>
-          <label class="label"><span class="label-text text-xs">Data fim</span></label>
-          <input
+          <label class="label" for="filtro-fim"><span class="label-text text-xs">Data fim</span></label>
+          <input id="filtro-fim"
             type="date"
             class="input input-bordered w-full"
             [ngModel]="filtroFim()"
             (ngModelChange)="filtroFim.set($event)" />
         </div>
       </div>
+
+      <label class="label cursor-pointer justify-start gap-2 mt-2 w-fit">
+        <input type="checkbox" class="checkbox checkbox-sm checkbox-warning" [ngModel]="filtroSuspeito()" (ngModelChange)="filtroSuspeito.set($event)" />
+        <span class="label-text text-sm">Só horário a conferir <span class="text-base-content/50">(registro offline com hora do celular fora do esperado)</span></span>
+      </label>
 
     </div>
   </div>
@@ -135,6 +141,9 @@
         <div class="flex justify-center py-16">
           <span class="loading loading-spinner loading-lg text-primary"></span>
         </div>
+
+      } @else if (erroCarregar()) {
+        <app-erro-carregar [mensagem]="erroCarregar()" (tentarDeNovo)="carregar()" />
 
       } @else if (abastecimentosFiltrados().length === 0) {
         <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
@@ -159,35 +168,24 @@
             </thead>
             <tbody>
   @for (a of abastecimentosPaginados(); track a.id) {
-    <tr class="cursor-pointer hover" (click)="abrirModal(a)">
+    <tr class="cursor-pointer hover" appClicavel (click)="abrirModal(a)">
 
       <td class="text-sm text-base-content/70">
         {{ a.registradoEm | date:'dd/MM/yyyy' }}
         <p class="text-xs text-base-content/40">{{ a.registradoEm | date:'HH:mm' }}</p>
+        <app-selo-horario-suspeito [registro]="a" />
       </td>
 
       <td>
-        <div class="flex items-center gap-2" (click)="irParaMotorista(a.motoristaLogin, $event)">
-          @if (a.motoristaFoto) {
-            <div class="avatar">
-              <div class="w-9 h-9 rounded-full">
-                <img [src]="'data:image/jpeg;base64,' + a.motoristaFoto" alt="Foto" />
-              </div>
-            </div>
-          } @else {
-            <div class="avatar placeholder">
-              <div class="bg-primary text-primary-content rounded-full w-9 h-9">
-                <span class="text-sm font-bold">{{ a.motoristaNome.charAt(0) }}</span>
-              </div>
-            </div>
-          }
+        <div class="flex items-center gap-2" appClicavel [attr.aria-label]="'Abastecimentos de ' + a.motoristaNome" (click)="irParaMotorista(a.motoristaLogin, $event)">
+          <app-avatar [foto]="a.motoristaFoto" [nome]="a.motoristaNome" />
           <span class="text-sm font-medium hover:text-primary hover:underline">
             {{ a.motoristaNome }}
           </span>
         </div>
       </td>
 
-      <td (click)="irParaVeiculo(a.veiculoId, $event)">
+      <td appClicavel (click)="irParaVeiculo(a.veiculoId, $event)">
         <p class="text-sm font-medium hover:text-primary hover:underline">
           {{ a.veiculoDescricao }}
         </p>
@@ -250,78 +248,17 @@
   </div>
 
   <!-- Modal detalhes -->
-  @if (selecionado()) {
-    <div class="modal modal-open">
-      <div class="modal-box">
-
-        <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModal()">
-          <i class="ti ti-x"></i>
-        </button>
-
-        <h3 class="font-bold text-lg mb-4">Detalhes do Abastecimento</h3>
-
-        <div class="space-y-3">
-          <div class="flex justify-between items-center">
-            <span class="text-base-content/60 text-sm">Data</span>
-            <span class="font-medium">{{ selecionado()!.registradoEm | date:'dd/MM/yyyy HH:mm' }}</span>
-          </div>
-          <div class="flex justify-between items-center">
-            <span class="text-base-content/60 text-sm">Motorista</span>
-            <span class="font-medium">{{ selecionado()!.motoristaNome }}</span>
-          </div>
-          <div class="flex justify-between items-center">
-            <span class="text-base-content/60 text-sm">Veículo</span>
-            <span class="font-medium">{{ selecionado()!.veiculoDescricao }}</span>
-          </div>
-          @if (selecionado()!.veiculoPlaca) {
-            <div class="flex justify-between items-center">
-              <span class="text-base-content/60 text-sm">Placa</span>
-              <span class="badge badge-outline">{{ selecionado()!.veiculoPlaca }}</span>
-            </div>
-          }
-          <div class="flex justify-between items-center">
-            <span class="text-base-content/60 text-sm">Combustível</span>
-            <span class="badge {{ getCorCombustivel(selecionado()!.tipoCombustivel) }}">
-              {{ selecionado()!.tipoCombustivel }}
-            </span>
-          </div>
-          <div class="divider my-1"></div>
-          <div class="flex justify-between items-center">
-            <span class="text-base-content/60 text-sm">Litros</span>
-            <span class="font-medium">{{ selecionado()!.litros | number:'1.1-1' }} L</span>
-          </div>
-          <div class="flex justify-between items-center">
-            <span class="text-base-content/60 text-sm">Valor total</span>
-            <span class="font-bold text-success text-lg">R$ {{ selecionado()!.valorTotal | number:'1.2-2' }}</span>
-          </div>
-          <div class="flex justify-between items-center">
-            <span class="text-base-content/60 text-sm">Valor por litro</span>
-            <span class="font-medium">R$ {{ (selecionado()!.valorTotal / selecionado()!.litros) | number:'1.2-2' }}/L</span>
-          </div>
-          @if (selecionado()!.posto) {
-            <div class="divider my-1"></div>
-            <div class="flex justify-between items-center">
-              <span class="text-base-content/60 text-sm">Posto</span>
-              <span class="font-medium">{{ selecionado()!.posto }}</span>
-            </div>
-          }
-        </div>
-
-        <div class="modal-action">
-          <button class="btn btn-primary" (click)="irParaMotorista(selecionado()!.motoristaLogin, $event)">
-            <i class="ti ti-user"></i>
-            Ver motorista
-          </button>
-          <button class="btn btn-outline" (click)="irParaVeiculo(selecionado()!.veiculoId, $event)">
-            <i class="ti ti-truck"></i>
-            Ver veículo
-          </button>
-          <button class="btn" (click)="fecharModal()">Fechar</button>
-        </div>
-
-      </div>
-      <div class="modal-backdrop" (click)="fecharModal()"></div>
-    </div>
+  @if (selecionado(); as s) {
+    <app-modal-abastecimento [abastecimento]="s" (fechar)="fecharModal()">
+      <button acoes class="btn btn-primary" (click)="irParaMotorista(s.motoristaLogin, $event)">
+        <i class="ti ti-user"></i>
+        Ver motorista
+      </button>
+      <button acoes class="btn btn-outline" (click)="irParaVeiculo(s.veiculoId, $event)">
+        <i class="ti ti-truck"></i>
+        Ver veículo
+      </button>
+    </app-modal-abastecimento>
   }
 
 </div>

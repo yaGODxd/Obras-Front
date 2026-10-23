@@ -1,8 +1,12 @@
-import { Component, OnInit, OnDestroy, AfterViewInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { UsuarioService, UltimaPosicao } from '../../services/usuario';
+import { RastreamentoService } from '../../services/rastreamento';
+import { UltimaPosicao } from '../../interfaces/rastreamento';
 import { interval, Subscription, startWith } from 'rxjs';
 import * as L from 'leaflet';
+import { criarElemento } from '../../shared/utils/html';
+import { rotuloVeiculo } from '../../shared/utils/placa';
+import { CENTRO_CRUZ_MACHADO, criarMapa } from '../../shared/utils/mapa';
 
 @Component({
   selector: 'app-mapa',
@@ -16,10 +20,11 @@ export class MapaComponent implements OnInit, AfterViewInit, OnDestroy {
   private mapa!: L.Map;
   private marcadores: Map<string, L.Marker> = new Map();
   private subscription?: Subscription;
-  posicoes: UltimaPosicao[] = [];
-  carregando = true;
+  // Signals: mudam depois da resposta HTTP (o app roda sem zone.js).
+  posicoes = signal<UltimaPosicao[]>([]);
+  carregando = signal(true);
 
-  constructor(private usuarioService: UsuarioService) {}
+  constructor(private rastreamentoService: RastreamentoService) {}
 
   ngAfterViewInit(): void {
     this.iniciarMapa();
@@ -37,32 +42,19 @@ export class MapaComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private iniciarMapa(): void {
-    this.mapa = L.map('mapa', {
-      center: [-26.0078, -51.3356],
-      zoom: 13
-    });
-
-    // Satélite Esri (base)
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution: 'Tiles © Esri'
-    }).addTo(this.mapa);
-
-    // Labels por cima: ruas, cidades, bairros
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
-      attribution: ''
-    }).addTo(this.mapa);
+    this.mapa = criarMapa('mapa', { center: CENTRO_CRUZ_MACHADO, zoom: 13 });
   }
 
   private atualizarPosicoes(): void {
     // Renomeado de buscarUltimasPosicoes → listarPosicoesAtuais
-    this.usuarioService.listarPosicoesAtuais().subscribe({
+    this.rastreamentoService.listarPosicoesAtuais().subscribe({
       next: (posicoes) => {
-        this.posicoes = posicoes;
-        this.carregando = false;
+        this.posicoes.set(posicoes);
+        this.carregando.set(false);
         this.atualizarMarcadores(posicoes);
       },
       error: () => {
-        this.carregando = false;
+        this.carregando.set(false);
       }
     });
   }
@@ -100,18 +92,7 @@ export class MapaComponent implements OnInit, AfterViewInit, OnDestroy {
         iconAnchor: [18, 18]
       });
 
-      // Popup atualizado com campos novos: veiculoPlaca e destino
-      const popup = `
-        <div style="min-width: 180px">
-          <p style="font-weight: bold; margin: 0 0 4px">${posicao.nomeCompleto}</p>
-          <p style="margin: 0 0 2px; color: #555; font-size: 12px">@${posicao.login}</p>
-          ${posicao.veiculoDescricao ? `<p style="margin: 4px 0; font-size: 12px">🚛 ${posicao.veiculoDescricao}${posicao.veiculoPlaca ? ' — ' + posicao.veiculoPlaca : ''}</p>` : ''}
-          ${posicao.destino ? `<p style="margin: 4px 0; font-size: 12px">📍 ${posicao.destino}</p>` : ''}
-          <p style="margin: 4px 0; font-size: 11px; color: #888">
-            Última atualização:<br>${posicao.registradoEm ? new Date(posicao.registradoEm).toLocaleString('pt-BR') : '-'}
-          </p>
-        </div>
-      `;
+      const popup = this.criarPopup(posicao);
 
       if (this.marcadores.has(posicao.login)) {
         const marcador = this.marcadores.get(posicao.login)!;
@@ -130,6 +111,28 @@ export class MapaComponent implements OnInit, AfterViewInit, OnDestroy {
       const grupo = L.featureGroup(Array.from(this.marcadores.values()));
       this.mapa.fitBounds(grupo.getBounds().pad(0.2));
     }
+  }
+
+  // Montado via DOM: nome, destino e veículo vêm do app do motorista e não podem virar HTML.
+  private criarPopup(posicao: UltimaPosicao): HTMLElement {
+    const caixa = criarElemento('div', '', 'min-width: 180px');
+    caixa.append(
+      criarElemento('p', posicao.nomeCompleto, 'font-weight: bold; margin: 0 0 4px'),
+      criarElemento('p', `@${posicao.login}`, 'margin: 0 0 2px; color: #555; font-size: 12px')
+    );
+    if (posicao.veiculoDescricao) {
+      caixa.append(criarElemento('p', `🚛 ${rotuloVeiculo(posicao.veiculoDescricao, posicao.veiculoPlaca)}`, 'margin: 4px 0; font-size: 12px'));
+    }
+    if (posicao.destino) {
+      caixa.append(criarElemento('p', `📍 ${posicao.destino}`, 'margin: 4px 0; font-size: 12px'));
+    }
+    const atualizacao = criarElemento('p', 'Última atualização:', 'margin: 4px 0; font-size: 11px; color: #888');
+    atualizacao.append(
+      document.createElement('br'),
+      posicao.registradoEm ? new Date(posicao.registradoEm).toLocaleString('pt-BR') : '-'
+    );
+    caixa.append(atualizacao);
+    return caixa;
   }
 
   getTempoAtras(registradoEm: string | null): string {

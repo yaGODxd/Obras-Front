@@ -1,21 +1,30 @@
-import { Component, OnInit, signal, computed, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal, computed, linkedSignal, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { UsuarioService, AbastecimentoDetalhado } from '../../services/usuario';
+import { AbastecimentoService } from '../../services/abastecimento';
+import { AbastecimentoDetalhado } from '../../interfaces/abastecimento';
 import { Chart, registerables } from 'chart.js';
 import { PaginacaoComponent } from '../../shared/components/paginacao/paginacao';
+import { inicioDoDiaLocal, fimDoDiaLocal } from '../../shared/utils/datas';
+import { ErroCarregarComponent } from '../../shared/components/erro-carregar/erro-carregar';
+import { mensagemDeErro } from '../../shared/utils/erros';
 
 Chart.register(...registerables);
+import { AvatarComponent } from '../../shared/components/avatar/avatar';
+import { ModalAbastecimentoComponent } from '../../shared/components/modal-abastecimento/modal-abastecimento';
+import { ClicavelDirective } from '../../shared/directives/clicavel';
+import { ehHorarioSuspeito } from '../../shared/utils/horario-suspeito';
+import { SeloHorarioSuspeitoComponent } from '../../shared/components/selo-horario-suspeito/selo-horario-suspeito';
 
 @Component({
   selector: 'app-abastecimentos',
   standalone: true,
-  imports: [CommonModule, FormsModule, PaginacaoComponent],
+  imports: [CommonModule, FormsModule, PaginacaoComponent, ErroCarregarComponent, AvatarComponent, ModalAbastecimentoComponent, ClicavelDirective, SeloHorarioSuspeitoComponent],
   templateUrl: './abastecimentos.html',
   styleUrl: './abastecimentos.css'
 })
-export class Abastecimentos implements OnInit {
+export class Abastecimentos implements OnInit, OnDestroy {
 
   @ViewChild('grafico1') grafico1!: ElementRef;
   @ViewChild('grafico2') grafico2!: ElementRef;
@@ -25,9 +34,11 @@ export class Abastecimentos implements OnInit {
 
   abastecimentos = signal<AbastecimentoDetalhado[]>([]);
   carregando = signal(true);
+  erroCarregar = signal('');
   busca = signal('');
   selecionado = signal<AbastecimentoDetalhado | null>(null);
   filtroTipo = signal('');
+  filtroSuspeito = signal(false);
   filtroInicio = signal('');
   filtroFim = signal('');
 
@@ -51,13 +62,13 @@ export class Abastecimentos implements OnInit {
     if (this.filtroTipo()) {
       lista = lista.filter(a => a.tipoCombustivel === this.filtroTipo());
     }
-    if (this.filtroInicio()) {
-      const inicio = new Date(this.filtroInicio());
+    if (this.filtroSuspeito()) lista = lista.filter(ehHorarioSuspeito);
+    const inicio = inicioDoDiaLocal(this.filtroInicio());
+    if (inicio) {
       lista = lista.filter(a => a.registradoEm && new Date(a.registradoEm) >= inicio);
     }
-    if (this.filtroFim()) {
-      const fim = new Date(this.filtroFim());
-      fim.setHours(23, 59, 59);
+    const fim = fimDoDiaLocal(this.filtroFim());
+    if (fim) {
       lista = lista.filter(a => a.registradoEm && new Date(a.registradoEm) <= fim);
     }
     return lista;
@@ -72,22 +83,41 @@ export class Abastecimentos implements OnInit {
   );
 
   constructor(
-    private usuarioService: UsuarioService,
+    private abastecimentoService: AbastecimentoService,
     private router: Router
   ) {}
 
+  // Ao sair da tela: destrói os gráficos (o Chart.js guarda referências aos canvas).
+  private destruido = false;
+
+  ngOnDestroy(): void {
+    this.destruido = true;
+    this.charts.forEach(c => c.destroy());
+    this.charts = [];
+  }
+
   ngOnInit(): void {
-    this.usuarioService.listarAbastecimentos().subscribe({
+    this.carregar();
+  }
+
+  carregar(): void {
+    this.carregando.set(true);
+    this.erroCarregar.set('');
+    this.abastecimentoService.listarAbastecimentos().subscribe({
       next: (data) => {
         this.abastecimentos.set(data);
         this.carregando.set(false);
         setTimeout(() => this.renderizarGraficos(), 300);
       },
-      error: () => this.carregando.set(false)
+      error: (e) => {
+        this.erroCarregar.set(mensagemDeErro(e));
+        this.carregando.set(false);
+      }
     });
   }
 
   private renderizarGraficos(): void {
+    if (this.destruido) return; // a tela fechou antes do setTimeout
     this.charts.forEach(c => c.destroy());
     this.charts = [];
 
@@ -236,20 +266,17 @@ export class Abastecimentos implements OnInit {
     this.paginaAtual.set(1);
     this.busca.set('');
     this.filtroTipo.set('');
+    this.filtroSuspeito.set(false);
     this.filtroInicio.set('');
     this.filtroFim.set('');
   }
 
-  getCorCombustivel(tipo: string): string {
-    const t = tipo.toLowerCase();
-    if (t.includes('diesel')) return 'badge-warning';
-    if (t.includes('gasolina')) return 'badge-error';
-    if (t.includes('etanol')) return 'badge-success';
-    if (t.includes('gnv')) return 'badge-info';
-    return 'badge-neutral';
-  }
 
-paginaAtual = signal(1);
+// Volta para a página 1 sempre que a busca ou um filtro muda.
+paginaAtual = linkedSignal({
+  source: () => [this.busca(), this.filtroTipo(), this.filtroInicio(), this.filtroFim(), this.filtroSuspeito()],
+  computation: () => 1
+});
 readonly porPagina = 10;
 
 abastecimentosPaginados = computed(() => {

@@ -1,0 +1,174 @@
+@let d = diario();
+@let e = estado();
+@let v = verificacao();
+<div class="modal modal-open" appModal (fechar)="fechar.emit()">
+  <div class="modal-box max-w-2xl">
+
+    <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Fechar" (click)="fechar.emit()">
+      <i class="ti ti-x"></i>
+    </button>
+
+    <div class="flex flex-wrap items-center gap-2 mb-4 pr-8">
+      <h3 class="font-bold text-lg">
+        @if (d.abertoEm) { Diário de {{ d.abertoEm | date:'dd/MM/yyyy' }} } @else { Diário }
+      </h3>
+      <app-status-badge [texto]="rotuloStatus(d.status)" [cor]="badgeStatus(d.status)" />
+    </div>
+
+    <!-- De relance -->
+    <div class="flex flex-wrap gap-2 mb-4">
+      <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-base-200 text-sm">
+        <i class="ti ti-gas-station text-warning" aria-hidden="true"></i>
+        Abastecimentos: <strong>{{ contagemAbastecimentos() }}</strong>
+      </div>
+      <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-base-200 text-sm">
+        <i class="ti ti-alert-triangle text-error" aria-hidden="true"></i>
+        Ocorrências: <strong>{{ contagemOcorrencias() }}</strong>
+      </div>
+    </div>
+
+    <!-- Resumo (dados da linha, sem nova chamada) -->
+    <h4 class="font-semibold mb-2">Resumo</h4>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+      <div class="flex justify-between gap-2"><span class="text-base-content/60">Motorista</span><span class="font-medium text-right">{{ d.motoristaNome }}</span></div>
+      <div class="flex justify-between gap-2">
+        <span class="text-base-content/60">Veículo</span>
+        <span class="font-medium text-right">{{ d.veiculoDescricao }} <span class="badge badge-outline badge-sm" [class.opacity-60]="!temPlaca(d.veiculoPlaca)">{{ rotuloPlaca(d.veiculoPlaca) }}</span></span>
+      </div>
+      <div class="flex justify-between gap-2 sm:col-span-2"><span class="text-base-content/60">Destino</span><span class="font-medium text-right">{{ d.destino ?? '-' }}</span></div>
+      <div class="flex justify-between gap-2"><span class="text-base-content/60">Medidor inicial</span><span class="font-medium">{{ medidor(d.medidorInicial) }}</span></div>
+      <div class="flex justify-between gap-2"><span class="text-base-content/60">Medidor final</span><span class="font-medium">{{ medidor(d.medidorFinal) }}</span></div>
+      <div class="flex justify-between gap-2"><span class="text-base-content/60">Percorrido</span><span class="font-bold text-info">{{ medidor(d.medidorPercorrido) }}</span></div>
+      <div class="hidden sm:block"></div>
+      <div class="flex justify-between gap-2"><span class="text-base-content/60">Abertura</span><span class="font-medium">{{ d.abertoEm ? (d.abertoEm | date:'dd/MM/yyyy HH:mm') : '-' }}</span></div>
+      <div class="flex justify-between gap-2"><span class="text-base-content/60">Fechamento</span><span class="font-medium">{{ d.fechadoEm ? (d.fechadoEm | date:'dd/MM/yyyy HH:mm') : '-' }}</span></div>
+    </div>
+
+    <!-- Integridade (só diário assinado) -->
+    @if (d.status === 'assinado') {
+      <div class="divider my-3"></div>
+      <h4 class="font-semibold mb-2">Integridade da assinatura</h4>
+      @if (!v || v.tipo === 'carregando') {
+        <p class="flex items-center gap-2 text-sm text-base-content/60">
+          <span class="loading loading-spinner loading-xs" aria-hidden="true"></span> Verificando a assinatura...
+        </p>
+      } @else if (v.tipo === 'resultado') {
+        <div class="flex flex-col gap-1">
+          <p class="flex items-center gap-1 font-semibold" [class.text-success]="v.integro" [class.text-error]="!v.integro">
+            <i class="ti" [class.ti-circle-check]="v.integro" [class.ti-alert-triangle]="!v.integro" aria-hidden="true"></i>
+            {{ v.integro ? 'Íntegro' : 'Alterado depois da assinatura' }}
+          </p>
+          <p class="text-sm" [class.text-error]="!v.integro">{{ v.mensagem }}</p>
+          @if (v.assinadoEm) {
+            <p class="text-xs text-base-content/60">Assinado em {{ v.assinadoEm | date:'dd/MM/yyyy HH:mm' }}</p>
+          }
+        </div>
+      } @else {
+        <div class="flex flex-wrap items-center gap-2">
+          <p class="text-sm text-error">{{ v.mensagem }}</p>
+          <button class="btn btn-ghost btn-xs" (click)="verificar.emit()">Tentar de novo</button>
+        </div>
+      }
+    }
+
+    <div class="divider my-3"></div>
+
+    @if (e.tipo === 'carregando') {
+      <div class="flex justify-center py-8"><span class="loading loading-spinner loading-lg text-primary" aria-label="Carregando"></span></div>
+    } @else if (e.tipo === 'erro') {
+      <app-erro-carregar [mensagem]="e.mensagem" (tentarDeNovo)="tentarDeNovo.emit()" />
+    } @else {
+      <!-- Abastecimentos -->
+      <h4 class="font-semibold mb-2">Abastecimentos</h4>
+      @if (abastecimentos().length === 0) {
+        <p class="text-sm text-base-content/60">Nenhum abastecimento neste diário.</p>
+      } @else {
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead>
+              <tr><th>Hora</th><th>Combustível</th><th class="text-right">Litros</th><th class="text-right">Valor</th><th>Posto</th></tr>
+            </thead>
+            <tbody>
+              @for (a of abastecimentos(); track $index) {
+                <tr>
+                  <td>{{ a.registradoEm ? (a.registradoEm | date:'HH:mm') : '-' }} <app-selo-horario-suspeito [registro]="a" /></td>
+                  <td><app-status-badge [texto]="a.tipoCombustivel" [cor]="badgeCombustivel(a.tipoCombustivel) + ' badge-sm'" /></td>
+                  <td class="text-right">{{ litros(a.litros) }}</td>
+                  <td class="text-right">{{ formatarMoeda(a.valorTotal) }}</td>
+                  <td>{{ a.posto ?? '-' }}</td>
+                </tr>
+                @if (a.id) {
+                  <tr class="border-0">
+                    <td colspan="5" class="p-0">
+                      <app-fotos-vinculadas [diarioId]="d.id" [abastecimentoId]="a.id" classe="px-2 pb-2" />
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+            <tfoot>
+              <tr>
+                <th colspan="2">Total</th>
+                <th class="text-right">{{ litros(totais().litros) }}</th>
+                <th class="text-right text-success">{{ formatarMoeda(totais().valor) }}</th>
+                <th></th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      }
+
+      <!-- Ocorrências -->
+      <div class="flex flex-wrap items-center justify-between gap-2 mt-4 mb-2">
+        <h4 class="font-semibold">Ocorrências</h4>
+        @if (ocorrencias().length > 0) {
+          <select class="select select-bordered select-sm" aria-label="Filtrar ocorrências por status"
+            [ngModel]="filtroStatusOcorrencia()" (ngModelChange)="filtroStatusOcorrencia.set($event)">
+            <option value="">Todos os status</option>
+            @for (s of opcoesStatusOcorrencia; track s) {
+              <option [value]="s">{{ rotuloStatusOcorrencia(s) }}</option>
+            }
+          </select>
+        }
+      </div>
+      @if (ocorrencias().length === 0) {
+        <p class="text-sm text-base-content/60">Nenhuma ocorrência neste diário.</p>
+      } @else if (ocorrenciasFiltradas().length === 0) {
+        <p class="text-sm text-base-content/60">Nenhuma ocorrência com este status.</p>
+      } @else {
+        <ul class="space-y-2">
+          @for (o of ocorrenciasFiltradas(); track $index) {
+            <li class="p-3 rounded-lg bg-base-200 text-sm">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-medium">{{ o.registradoEm ? (o.registradoEm | date:'HH:mm') : '-' }}</span>
+                <app-status-badge [texto]="o.tipo" [cor]="badgeTipoOcorrencia(o.tipo) + ' badge-sm'" />
+                <app-status-badge [texto]="rotuloStatusOcorrencia(statusOcorrencia(o))" [cor]="badgeStatusOcorrencia(statusOcorrencia(o)) + ' badge-sm'" />
+                <app-selo-horario-suspeito [registro]="o" />
+              </div>
+              <p class="mt-1">{{ o.descricao }}</p>
+              @if (o.latitude != null && o.longitude != null) {
+                <p class="mt-1 text-xs text-base-content/60">
+                  <i class="ti ti-map-pin text-success" aria-hidden="true"></i> Local registrado: {{ local(o) }}
+                </p>
+              }
+              @if (o.id) {
+                <app-fotos-vinculadas [diarioId]="d.id" [ocorrenciaId]="o.id" classe="mt-2" />
+              }
+            </li>
+          }
+        </ul>
+      }
+    }
+
+    <div class="divider my-3"></div>
+    <app-fotos-diario [diarioId]="d.id" />
+
+    <div class="modal-action flex-wrap">
+      <button class="btn btn-ghost gap-1" (click)="verRota.emit()"><i class="ti ti-map-pin text-primary"></i> Ver rota</button>
+      <button class="btn btn-ghost gap-1" (click)="checklist.emit()"><i class="ti ti-checklist text-success"></i> Checklist</button>
+      <button class="btn" (click)="fechar.emit()">Fechar</button>
+    </div>
+
+  </div>
+  <div class="modal-backdrop" (click)="fechar.emit()"></div>
+</div>

@@ -55,16 +55,16 @@
       <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <label class="input input-bordered flex items-center gap-2 sm:col-span-2">
           <i class="ti ti-search text-base-content/40"></i>
-          <input type="text" class="grow" placeholder="Buscar por veículo, descrição ou mecânico..."
+          <input type="text" class="grow" placeholder="Buscar por veículo, descrição ou mecânico..." aria-label="Buscar manutenções"
             [ngModel]="busca()" (ngModelChange)="busca.set($event)" />
         </label>
-        <select class="select select-bordered w-full"
+        <select class="select select-bordered w-full" aria-label="Filtrar por tipo"
           [ngModel]="filtroTipo()" (ngModelChange)="filtroTipo.set($event)">
           <option value="">Todos os tipos</option>
           <option value="preventiva">Preventiva</option>
           <option value="corretiva">Corretiva</option>
         </select>
-        <select class="select select-bordered w-full"
+        <select class="select select-bordered w-full" aria-label="Filtrar por status"
           [ngModel]="filtroStatus()" (ngModelChange)="filtroStatus.set($event)">
           <option value="">Todos os status</option>
           <option value="aberta">Aberta</option>
@@ -88,6 +88,8 @@
         <div class="flex justify-center py-16">
           <span class="loading loading-spinner loading-lg text-primary"></span>
         </div>
+      } @else if (erroCarregar()) {
+        <app-erro-carregar [mensagem]="erroCarregar()" (tentarDeNovo)="carregarManutencoes()" />
       } @else if (manutencoesFiltradas().length === 0) {
         <div class="flex flex-col items-center py-16 gap-3 text-base-content/40">
           <i class="ti ti-tool text-6xl"></i>
@@ -110,7 +112,7 @@
             </thead>
             <tbody>
               @for (m of manutencoesPaginadas(); track m.id) {
-                <tr class="cursor-pointer hover" (click)="verDetalhe(m.id!)">
+                <tr class="cursor-pointer hover" appClicavel (click)="verDetalhe(m.id!)">
                   <td>
                     <p class="font-medium">{{ m.veiculoDescricao }}</p>
                     @if (m.veiculoPlaca) {
@@ -121,7 +123,7 @@
                     <p class="text-sm truncate">{{ m.descricao }}</p>
                   </td>
                   <td>
-                    <span class="badge badge-outline">{{ labelTipo(m.tipo) }}</span>
+                    <app-status-badge [texto]="labelTipo(m.tipo)" cor="badge-outline" />
                   </td>
                   <td class="text-sm text-base-content/70">
                     {{ m.mecanicoResponsavel ?? '-' }}
@@ -137,9 +139,7 @@
                     R$ {{ m.custoTotal | number:'1.2-2' }}
                   </td>
                   <td class="text-center">
-                    <span class="badge badge-outline {{ badgeStatus(m.status) }}">
-                      {{ labelStatus(m.status) }}
-                    </span>
+                    <app-status-badge [texto]="labelStatus(m.status)" [cor]="'badge-outline ' + badgeStatus(m.status)" />
                   </td>
                 </tr>
               }
@@ -160,10 +160,10 @@
 
 <!-- MODAL NOVA MANUTENÇÃO -->
 @if (modalAberto()) {
-  <div class="modal modal-open">
+  <div class="modal modal-open" appModal (fechar)="fecharModal()">
     <div class="modal-box max-w-3xl">
 
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModal()">
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Fechar" (click)="fecharModal()">
         <i class="ti ti-x"></i>
       </button>
 
@@ -173,61 +173,61 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
 
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Veículo *</span></label>
-          <select class="select select-bordered" [(ngModel)]="novaManutencao.veiculoId">
+          <label class="label" for="man-veiculo"><span class="label-text font-medium">Veículo *</span></label>
+          <select id="man-veiculo" class="select select-bordered" [(ngModel)]="novaManutencao.veiculoId">
             <option value="">Selecione o veículo</option>
             @for (v of veiculos(); track v.id) {
-              <option [value]="v.id">{{ v.descricao }} {{ v.placa ? '— ' + v.placa : '' }}</option>
+              <option [value]="v.id">{{ labelVeiculo(v) }}</option>
             }
           </select>
         </div>
 
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Tipo *</span></label>
-          <select class="select select-bordered" [(ngModel)]="novaManutencao.tipo">
+          <label class="label" for="man-tipo"><span class="label-text font-medium">Tipo *</span></label>
+          <select id="man-tipo" class="select select-bordered" [(ngModel)]="novaManutencao.tipo">
             <option value="preventiva">Preventiva</option>
             <option value="corretiva">Corretiva</option>
           </select>
         </div>
 
         <div class="form-control sm:col-span-2">
-          <label class="label"><span class="label-text font-medium">Descrição *</span></label>
-          <input type="text" class="input input-bordered" placeholder="Descreva o serviço"
+          <label class="label" for="man-descricao"><span class="label-text font-medium">Descrição *</span></label>
+          <input id="man-descricao" type="text" class="input input-bordered" placeholder="Descreva o serviço"
             [(ngModel)]="novaManutencao.descricao" />
         </div>
 
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Mecânico responsável</span></label>
-          <select class="select select-bordered" [(ngModel)]="novaManutencao.mecanicoResponsavel">
-            <option [value]="null">Selecione o mecânico</option>
+          <label class="label" for="man-mecanico"><span class="label-text font-medium">Mecânico responsável</span></label>
+          <select id="man-mecanico" class="select select-bordered" [(ngModel)]="novaManutencao.mecanicoResponsavel">
+            <option [ngValue]="null">Selecione o mecânico</option>
             @for (m of mecanicos(); track m.id) {
-              <option [value]="m.nome">{{ m.nome }}{{ m.especialidade ? ' — ' + m.especialidade : '' }}</option>
+              <option [ngValue]="m.nome">{{ m.nome }}{{ m.especialidade ? ' — ' + m.especialidade : '' }}</option>
             }
           </select>
         </div>
 
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Posto/Oficina</span></label>
-          <select class="select select-bordered" [(ngModel)]="novaManutencao.oficina">
-            <option [value]="null">Selecione o posto/oficina</option>
+          <label class="label" for="man-oficina"><span class="label-text font-medium">Posto/Oficina</span></label>
+          <select id="man-oficina" class="select select-bordered" [(ngModel)]="novaManutencao.oficina">
+            <option [ngValue]="null">Selecione o posto/oficina</option>
             @for (p of postos(); track p.id) {
-              <option [value]="p.nome">{{ p.nome }}{{ p.cidade ? ' — ' + p.cidade : '' }}</option>
+              <option [ngValue]="p.nome">{{ p.nome }}{{ p.cidade ? ' — ' + p.cidade : '' }}</option>
             }
           </select>
         </div>
 
         <div class="form-control">
-          <label class="label"><span class="label-text font-medium">Custo mão de obra (R$)</span></label>
-          <input type="number" class="input input-bordered" min="0" [(ngModel)]="novaManutencao.custoMaoObra" />
+          <label class="label" for="man-mao-obra"><span class="label-text font-medium">Custo mão de obra (R$)</span></label>
+          <input id="man-mao-obra" type="number" class="input input-bordered" min="0" [(ngModel)]="novaManutencao.custoMaoObra" />
         </div>
 
         <div class="form-control sm:col-span-2">
-          <label class="label"><span class="label-text font-medium">Ocorrência vinculada (opcional)</span></label>
+          <p class="label"><span class="label-text font-medium">Ocorrência vinculada (opcional)</span></p>
           @if (ocorrenciaSelecionadaNome()) {
             <div class="flex items-center gap-2 p-3 bg-base-200 rounded-lg">
               <i class="ti ti-alert-triangle text-warning"></i>
               <span class="text-sm flex-1">{{ ocorrenciaSelecionadaNome() }}</span>
-              <button class="btn btn-ghost btn-xs text-error" (click)="limparOcorrencia()">
+              <button class="btn btn-ghost btn-xs text-error" aria-label="Desvincular ocorrência" (click)="limparOcorrencia()">
                 <i class="ti ti-x"></i>
               </button>
             </div>
@@ -240,24 +240,24 @@
         </div>
 
         <div class="form-control sm:col-span-2">
-          <label class="label"><span class="label-text font-medium">Foto da nota fiscal (opcional)</span></label>
-          @if (fotoNotaFiscal) {
+          <label class="label" for="man-nota"><span class="label-text font-medium">Foto da nota fiscal (opcional)</span></label>
+          @if (fotoNotaFiscal(); as foto) {
             <div class="flex items-center gap-3 p-3 bg-base-200 rounded-lg">
-              <img [src]="'data:image/jpeg;base64,' + fotoNotaFiscal" class="w-16 h-16 object-cover rounded-lg" />
+              <img [src]="'data:image/jpeg;base64,' + foto" alt="Prévia da nota fiscal" class="w-16 h-16 object-cover rounded-lg" />
               <span class="text-sm flex-1">Foto anexada</span>
-              <button class="btn btn-ghost btn-xs text-error" (click)="limparFotoNota()">
+              <button class="btn btn-ghost btn-xs text-error" aria-label="Remover foto da nota fiscal" (click)="limparFotoNota()">
                 <i class="ti ti-trash"></i>
               </button>
             </div>
           } @else {
-            <input type="file" class="file-input file-input-bordered w-full"
-              accept="image/*" (change)="onFotoNotaFiscal($event)" />
+            <input id="man-nota" type="file" class="file-input file-input-bordered w-full"
+              accept="image/jpeg,image/png,image/webp" (change)="onFotoNotaFiscal($event)" />
           }
         </div>
 
         <div class="form-control sm:col-span-2">
-          <label class="label"><span class="label-text font-medium">Observações</span></label>
-          <textarea class="textarea textarea-bordered" rows="2" placeholder="Observações adicionais"
+          <label class="label" for="man-observacoes"><span class="label-text font-medium">Observações</span></label>
+          <textarea id="man-observacoes" class="textarea textarea-bordered" rows="2" placeholder="Observações adicionais"
             [(ngModel)]="novaManutencao.observacoes"></textarea>
         </div>
 
@@ -267,33 +267,43 @@
 
       <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-3">
         <div class="sm:col-span-2 form-control">
-          <label class="label py-1"><span class="label-text text-xs">Nome da peça *</span></label>
-          <input type="text" class="input input-bordered input-sm" placeholder="Ex: Filtro de óleo"
+          <label class="label py-1" for="peca-nome"><span class="label-text text-xs">Nome da peça *</span></label>
+          <input id="peca-nome" type="text" class="input input-bordered input-sm" placeholder="Ex: Filtro de óleo"
             [(ngModel)]="novaPeca.nomePeca" />
         </div>
         <div class="form-control">
-          <label class="label py-1"><span class="label-text text-xs">Código</span></label>
-          <input type="text" class="input input-bordered input-sm" placeholder="Ex: 12345"
+          <label class="label py-1" for="peca-codigo"><span class="label-text text-xs">Código</span></label>
+          <input id="peca-codigo" type="text" class="input input-bordered input-sm" placeholder="Ex: 12345"
             [(ngModel)]="novaPeca.codigoPeca" />
         </div>
         <div class="form-control">
-          <label class="label py-1"><span class="label-text text-xs">Marca</span></label>
-          <input type="text" class="input input-bordered input-sm" placeholder="Ex: Bosch"
+          <label class="label py-1" for="peca-marca"><span class="label-text text-xs">Marca</span></label>
+          <input id="peca-marca" type="text" class="input input-bordered input-sm" placeholder="Ex: Bosch"
             [(ngModel)]="novaPeca.marcaPeca" />
         </div>
         <div class="form-control">
-          <label class="label py-1"><span class="label-text text-xs">Qtd</span></label>
-          <input type="number" class="input input-bordered input-sm" min="1" [(ngModel)]="novaPeca.quantidade" />
+          <label class="label py-1" for="peca-qtd"><span class="label-text text-xs">Qtd</span></label>
+          <input id="peca-qtd" type="number" class="input input-bordered input-sm" min="1" [(ngModel)]="novaPeca.quantidade" />
         </div>
         <div class="form-control sm:col-span-2">
-          <label class="label py-1"><span class="label-text text-xs">Valor unitário (R$)</span></label>
-          <input type="number" class="input input-bordered input-sm" min="0" [(ngModel)]="novaPeca.valorUnitario" />
+          <label class="label py-1" for="peca-valor"><span class="label-text text-xs">Valor unitário (R$)</span></label>
+          <input id="peca-valor" type="number" class="input input-bordered input-sm" min="0" [(ngModel)]="novaPeca.valorUnitario" />
         </div>
-        <div class="sm:col-span-3 flex items-end">
-          <button class="btn btn-outline btn-sm gap-2 w-full" (click)="adicionarPeca()">
-            <i class="ti ti-plus"></i>
-            Adicionar peça
-          </button>
+        <div class="sm:col-span-3 flex items-end gap-2">
+          @if (indicePecaEmEdicao() === null) {
+            <button type="button" class="btn btn-outline btn-sm gap-2 flex-1" (click)="salvarPeca()">
+              <i class="ti ti-plus"></i>
+              Adicionar peça
+            </button>
+          } @else {
+            <button type="button" class="btn btn-primary btn-sm gap-2 flex-1" (click)="salvarPeca()">
+              <i class="ti ti-device-floppy"></i>
+              Salvar alteração
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" (click)="cancelarEdicaoPeca()">
+              Cancelar edição
+            </button>
+          }
         </div>
       </div>
 
@@ -315,17 +325,27 @@
                 </thead>
                 <tbody>
                   @for (p of pecasForm; track $index) {
-                    <tr>
+                    <tr [class.bg-primary/10]="indicePecaEmEdicao() === $index"
+                        [attr.aria-current]="indicePecaEmEdicao() === $index ? 'true' : null">
                       <td class="font-medium">{{ p.nomePeca }}</td>
                       <td class="text-base-content/60">{{ p.codigoPeca ?? '-' }}</td>
                       <td class="text-base-content/60">{{ p.marcaPeca ?? '-' }}</td>
                       <td class="text-center">{{ p.quantidade }}</td>
                       <td class="text-right">R$ {{ p.valorUnitario | number:'1.2-2' }}</td>
-                      <td class="text-right font-bold text-primary">R$ {{ (p.quantidade * p.valorUnitario) | number:'1.2-2' }}</td>
-                      <td>
-                        <button class="btn btn-ghost btn-xs text-error" (click)="removerPeca($index)">
-                          <i class="ti ti-trash"></i>
-                        </button>
+                      <td class="text-right font-bold text-primary">R$ {{ totalPeca(p) | number:'1.2-2' }}</td>
+                      <td class="whitespace-nowrap">
+                        <div class="flex items-center gap-1">
+                          <button type="button" class="btn btn-ghost btn-xs"
+                            [attr.aria-label]="'Editar peça ' + p.nomePeca" [title]="'Editar peça ' + p.nomePeca"
+                            (click)="editarPeca($index)">
+                            <i class="ti ti-pencil"></i>
+                          </button>
+                          <button type="button" class="btn btn-ghost btn-xs text-error"
+                            [attr.aria-label]="'Remover peça ' + p.nomePeca" [title]="'Remover peça ' + p.nomePeca"
+                            (click)="removerPeca($index)">
+                            <i class="ti ti-trash"></i>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   }
@@ -359,17 +379,18 @@
 
 <!-- MODAL BUSCA OCORRÊNCIA -->
 @if (modalOcorrencia()) {
-  <div class="modal modal-open" style="z-index: 1000;">
+  <div class="modal modal-open" style="z-index: 1000;" appModal (fechar)="fecharModalOcorrencia()">
     <div class="modal-box max-w-2xl">
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" (click)="fecharModalOcorrencia()">
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Fechar" (click)="fecharModalOcorrencia()">
         <i class="ti ti-x"></i>
       </button>
       <h3 class="font-bold text-lg mb-4">Buscar Ocorrência</h3>
       <label class="input input-bordered flex items-center gap-2 mb-4">
         <i class="ti ti-search text-base-content/40"></i>
-        <input type="text" class="grow" placeholder="Buscar por tipo, veículo ou motorista..."
+        <input type="text" class="grow" placeholder="Buscar por tipo, veículo ou motorista..." aria-label="Buscar ocorrências"
           [ngModel]="buscaOcorrencia()" (ngModelChange)="buscaOcorrencia.set($event)" />
       </label>
+      <p class="text-xs text-base-content/50 -mt-2 mb-3">Ocorrências resolvidas não aparecem aqui.</p>
       @if (ocorrencias().length === 0) {
         <div class="flex justify-center py-8">
           <span class="loading loading-spinner loading-md text-primary"></span>
@@ -386,6 +407,7 @@
               <tr>
                 <th>Data</th>
                 <th>Tipo</th>
+                <th>Status</th>
                 <th>Veículo</th>
                 <th>Motorista</th>
                 <th></th>
@@ -393,9 +415,10 @@
             </thead>
             <tbody>
               @for (o of ocorrenciasFiltradas(); track o.id) {
-                <tr class="cursor-pointer hover" (click)="selecionarOcorrencia(o)">
+                <tr class="cursor-pointer hover" appClicavel (click)="selecionarOcorrencia(o)">
                   <td class="text-sm">{{ o.registradoEm | date:'dd/MM/yyyy' }}</td>
-                  <td><span class="badge badge-sm badge-outline">{{ o.tipo }}</span></td>
+                  <td><app-status-badge [texto]="o.tipo" cor="badge-sm badge-outline" /></td>
+                  <td><app-status-badge [texto]="labelStatusOcorrencia(o)" [cor]="'badge-sm ' + badgeStatusOcorrencia(o)" /></td>
                   <td class="text-sm">
                     <p class="font-medium">{{ o.veiculoDescricao }}</p>
                     @if (o.veiculoPlaca) {
